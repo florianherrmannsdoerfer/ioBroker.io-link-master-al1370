@@ -83,11 +83,12 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 
 		let hostAlive = true;
 		while (hostAlive) {
+			let resultSensor135;
 			// checkIsHostAlive(ipOfIOLink);
 			// for (let [sensorPort, sensorId] of sensorPortMap) {
 			const sensorId = 135;
 			if (sensorId === 135) {
-				getValueForSensor135(1, ipOfIOLink);
+				resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
 			} else if (sensorId === 6) {
 				// getValueForSensor6(sensorPort, ipOfIOLink);
 			} else if (sensorId === 25) {
@@ -99,6 +100,8 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			}
 			// }
 			this.log.info('alive');
+			this.log.info(resultSensor135[0]);
+			this.log.info(resultSensor135[1]);
 			await sleep(sleepTimer);
 		}
 		/*
