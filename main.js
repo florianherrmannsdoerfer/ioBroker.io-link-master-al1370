@@ -33,18 +33,13 @@ async function getValue(endpoint, requestBody) {
 	return res.data['data']['value'];
 }
 
-async function getHexStringForPort(sensorPort, endpoint) {
-	return await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
-}
 
-function getValueForSensor135(sensorPort, endpoint) {
-	const hexString = getHexStringForPort(sensorPort, endpoint);
-	// @ts-ignore
+async function getValueForSensor135(sensorPort, endpoint) {
+	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
 	const humiditySub = hexString.substring(0, 4);
 	let humidity = parseInt(humiditySub, 16);
 	humidity = humidity * 0.1;
 
-	// @ts-ignore
 	const tempSub = hexString.substring(8, 12);
 	let temp = parseInt(tempSub, 16);
 	temp = temp * 0.1;
