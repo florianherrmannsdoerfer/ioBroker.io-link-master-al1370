@@ -103,6 +103,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						write: false
 					}
 				});
+				this.setState('humidity135', humidity, true);
 
 				await this.setObjectNotExists(`temperature135`, {
 					type: 'state',
@@ -116,6 +117,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						write: false
 					}
 				});
+				this.setState('temperature135', temperature, true);
 				//adapter.setState(`${idProcessData}.humidity135`, humidity, true);
 			} else if (sensorId === 6) {
 				// getValueForSensor6(sensorPort, ipOfIOLink);
