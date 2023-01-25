@@ -10,9 +10,46 @@ const utils = require('@iobroker/adapter-core');
 
 // Load your modules here, e.g.:
 // const fs = require("fs");
+const axios = require('axios');
 
 function sleep(ms) {
 	return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getRequestBody(adr) {
+	return `{"code": "request", "cid": 1, "adr": "${adr}"}`;
+}
+
+async function getValue(endpoint, requestBody) {
+	const res = await axios({
+		method: 'post',
+		url: `http://${endpoint}`,
+		timeout: 8000,
+		data: requestBody,
+		headers: {'content-type': 'application/json'}
+	}).catch(function (error) {
+		throw new Error(error);
+	});
+	return res.data['data']['value'];
+}
+
+async function getHexStringForPort(sensorPort, endpoint) {
+	return await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
+}
+
+function getValueForSensor135(sensorPort, endpoint) {
+	const hexString = getHexStringForPort(sensorPort, endpoint);
+	// @ts-ignore
+	const humiditySub = hexString.substring(0, 4);
+	let humidity = parseInt(humiditySub, 16);
+	humidity = humidity * 0.1;
+
+	// @ts-ignore
+	const tempSub = hexString.substring(8, 12);
+	let temp = parseInt(tempSub, 16);
+	temp = temp * 0.1;
+
+	return [humidity, temp];
 }
 
 class IoLinkMasterAl1370 extends utils.Adapter {
@@ -38,15 +75,36 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 	async onReady() {
 
 		this.log.info('config option2: ' + this.config.ioLinkIp);
+		const ipOfIOLink = this.config.ioLinkIp;
+		const sleepTimer = this.config.sleepTimer;
+
+		// try {
+		// 	initHost(ipOfIOLink);
+		// } catch (error) {
+		// 	this.log.error('could not init IO Link: ' + error);
+		// }
+
+		// const sensorPortMap = getSensorPortMap(ipOfIOLink);
+
 		let hostAlive = true;
-		let i = 0;
 		while (hostAlive) {
-			this.log.info('alive');
-			await sleep(1000);
-			i++;
-			if (i === 60) {
-				hostAlive = false;
+			// checkIsHostAlive(ipOfIOLink);
+			// for (let [sensorPort, sensorId] of sensorPortMap) {
+			const sensorId = 135;
+			if (sensorId === 135) {
+				getValueForSensor135(1, ipOfIOLink);
+			} else if (sensorId === 6) {
+				// getValueForSensor6(sensorPort, ipOfIOLink);
+			} else if (sensorId === 25) {
+				// getValueForSensor25(sensorPort, ipOfIOLink);
+			} else if (sensorId === 48) {
+				// getValueForSensor48(sensorPort, ipOfIOLink);
+			} else {
+				throw new Error('unidentified sensor');
 			}
+			// }
+			this.log.info('alive');
+			await sleep(sleepTimer);
 		}
 		/*
 		For every state in the system there has to be also an object of type state

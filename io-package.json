@@ -78,7 +78,8 @@
 		]
 	},
 	"native": {
-		"ioLinkIp": "0.0.0.0"
+		"ioLinkIp": "0.0.0.0",
+		"sleepTimer": 1000
 	},
 	"objects": [],
 	"instanceObjects": []
