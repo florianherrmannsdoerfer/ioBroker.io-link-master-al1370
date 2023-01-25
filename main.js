@@ -11,6 +11,10 @@ const utils = require('@iobroker/adapter-core');
 // Load your modules here, e.g.:
 // const fs = require("fs");
 
+function sleep(ms) {
+	return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 class IoLinkMasterAl1370 extends utils.Adapter {
 
 	/**
@@ -34,7 +38,16 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 	async onReady() {
 
 		this.log.info('config option2: ' + this.config.ioLinkIp);
-
+		let hostAlive = true;
+		let i = 0;
+		while (hostAlive) {
+			this.log.info('alive');
+			await sleep(1000);
+			i++;
+			if (i === 60) {
+				hostAlive = false;
+			}
+		}
 		/*
 		For every state in the system there has to be also an object of type state
 		Here a simple template for a boolean variable named "testVariable"
