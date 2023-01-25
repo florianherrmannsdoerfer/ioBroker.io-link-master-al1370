@@ -1,0 +1,86 @@
+{
+	"common": {
+		"name": "io-link-master-al1370",
+		"version": "0.0.1",
+		"news": {
+			"0.0.1": {
+				"en": "initial release",
+				"de": "Erstveröffentlichung",
+				"ru": "Начальная версия",
+				"pt": "lançamento inicial",
+				"nl": "Eerste uitgave",
+				"fr": "Première version",
+				"it": "Versione iniziale",
+				"es": "Versión inicial",
+				"pl": "Pierwsze wydanie",
+				"zh-cn": "首次出版"
+			}
+		},
+		"title": "io-Link Master AL1370",
+		"titleLang": {
+			"en": "io-Link Master AL1370",
+			"de": "io-Link-Master AL1370",
+			"ru": "Мастер io-Link AL1370",
+			"pt": "io-Link Master AL1370",
+			"nl": "io-Link Master AL1370",
+			"fr": "Maître io-Link AL1370",
+			"it": "Master io-Link AL1370",
+			"es": "Maestro io-Link AL1370",
+			"pl": "io-Link Master AL1370",
+			"zh-cn": "io-Link 主机 AL1370"
+		},
+		"desc": {
+			"en": "Adapter for an IO-Link Master AL1370 made by ifm and the sensors AH002, AT001, AP011 and AS005 made by autosen",
+			"de": "Adapter für einen IO-Link Master AL1370 von ifm und die Sensoren AH002, AT001, AP011 und AS005 von autosen",
+			"ru": "Адаптер для IO-Link Master AL1370 производства ifm и датчиков AH002, AT001, AP011 и AS005 производства autosen",
+			"pt": "Adaptador para um IO-Link Master AL1370 fabricado pela ifm e os sensores AH002, AT001, AP011 e AS005 fabricados pela autosen",
+			"nl": "Adapter voor een IO-Link Master AL1370 van ifm en de sensoren AH002, AT001, AP011 en AS005 van autosen",
+			"fr": "Adaptateur pour un maître IO-Link AL1370 fabriqué par ifm et les capteurs AH002, AT001, AP011 et AS005 fabriqués par autosen",
+			"it": "Adattatore per un master IO-Link AL1370 prodotto da ifm e i sensori AH002, AT001, AP011 e AS005 prodotto da autosen",
+			"es": "Adaptador para un IO-Link Master AL1370 de ifm y los sensores AH002, AT001, AP011 y AS005 de autosen",
+			"pl": "Adapter do IO-Link Master AL1370 firmy ifm oraz czujników AH002, AT001, AP011 i AS005 firmy autosen",
+			"zh-cn": "适用于 ifm 制造的 IO-Link Master AL1370 和 autosen 制造的传感器 AH002、AT001、AP011 和 AS005 的适配器"
+		},
+		"authors": [
+			"lo <florian.herrmannsdoerfer@scc-group.eu>"
+		],
+		"keywords": [
+			"ioBroker",
+			"template",
+			"Smart Home",
+			"home automation"
+		],
+		"license": "MIT",
+		"platform": "Javascript/Node.js",
+		"main": "main.js",
+		"icon": "io-link-master-al1370.png",
+		"enabled": true,
+		"extIcon": "https://raw.githubusercontent.com/scc/ioBroker.io-link-master-al1370/main/admin/io-link-master-al1370.png",
+		"readme": "https://github.com/scc/ioBroker.io-link-master-al1370/blob/main/README.md",
+		"loglevel": "info",
+		"mode": "daemon",
+		"type": "communication",
+		"compact": true,
+		"connectionType": "local",
+		"dataSource": "poll",
+		"adminUI": {
+			"config": "materialize"
+		},
+		"dependencies": [
+			{
+				"js-controller": ">=3.3.22"
+			}
+		],
+		"globalDependencies": [
+			{
+				"admin": ">=5.0.0"
+			}
+		]
+	},
+	"native": {
+		"option1": true,
+		"option2": "42"
+	},
+	"objects": [],
+	"instanceObjects": []
+}
