@@ -89,6 +89,34 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			const sensorId = 135;
 			if (sensorId === 135) {
 				resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
+				const humidity = resultSensor135[0];
+				const temperature = resultSensor135[1];
+				await this.setObjectNotExists(`humidity135`, {
+					type: 'state',
+					common: {
+						name: 'Humidity135',
+						role: 'value.humidity135',
+						type: 'number',
+						value: humidity,
+						unit: '%',
+						read: true,
+						write: false
+					}
+				});
+
+				await this.setObjectNotExists(`temperature135`, {
+					type: 'state',
+					common: {
+						name: 'Temperature135',
+						role: 'value.temperature135',
+						type: 'number',
+						value: temperature,
+						unit: '%',
+						read: true,
+						write: false
+					}
+				});
+				//adapter.setState(`${idProcessData}.humidity135`, humidity, true);
 			} else if (sensorId === 6) {
 				// getValueForSensor6(sensorPort, ipOfIOLink);
 			} else if (sensorId === 25) {
