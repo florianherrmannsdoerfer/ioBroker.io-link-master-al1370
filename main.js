@@ -32,12 +32,8 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 	 * Is called when databases are connected and adapter received configuration.
 	 */
 	async onReady() {
-		// Initialize your adapter here
 
-		// The adapters config (in the instance object everything under the attribute "native") is accessible via
-		// this.config:
-		this.log.info('config option1: ' + this.config.option1);
-		this.log.info('config option2: ' + this.config.option2);
+		this.log.info('config option2: ' + this.config.ioLinkIp);
 
 		/*
 		For every state in the system there has to be also an object of type state
@@ -72,10 +68,10 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 
 		// same thing, but the value is flagged "ack"
 		// ack should be always set to true if the value is received from or acknowledged from the target system
-		await this.setStateAsync('testVariable', { val: true, ack: true });
+		await this.setStateAsync('testVariable', {val: true, ack: true});
 
 		// same thing, but the state is deleted after 30s (getState will return null afterwards)
-		await this.setStateAsync('testVariable', { val: true, ack: true, expire: 30 });
+		await this.setStateAsync('testVariable', {val: true, ack: true, expire: 30});
 
 		// examples for the checkPassword/checkGroup functions
 		let result = await this.checkPasswordAsync('admin', 'iobroker');
