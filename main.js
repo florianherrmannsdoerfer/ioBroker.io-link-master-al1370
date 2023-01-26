@@ -11,6 +11,10 @@ const utils = require('@iobroker/adapter-core');
 // Load your modules here, e.g.:
 // const fs = require("fs");
 const axios = require('axios');
+const {performance} = require('perf_hooks');
+
+//global variables
+const numberOfPorts = 4;
 
 function sleep(ms) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -21,6 +25,7 @@ function getRequestBody(adr) {
 }
 
 async function getValue(endpoint, requestBody) {
+	// @ts-ignore
 	const res = await axios({
 		method: 'post',
 		url: `http://${endpoint}`,
@@ -33,6 +38,15 @@ async function getValue(endpoint, requestBody) {
 	return res.data['data']['value'];
 }
 
+async function getSensorPortMap(ipOfIOLink) {
+	const sensorIdPortMap = new Map();
+	for (let i = 1; i <= numberOfPorts; i++) {
+		const sensorPort = i;
+		const sensorId = await getValue(ipOfIOLink, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/deviceid/getdata`));
+		sensorIdPortMap.set(sensorPort, sensorId);
+	}
+	return sensorIdPortMap;
+}
 
 async function getValueForSensor135(sensorPort, endpoint) {
 	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
@@ -45,6 +59,25 @@ async function getValueForSensor135(sensorPort, endpoint) {
 	temp = temp * 0.1;
 
 	return [humidity, temp];
+}
+
+async function getValueForSensor6(sensorPort, endpoint) {
+	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
+	const temperatureFlow = parseInt(hexString, 16);
+	return (temperatureFlow * 0.1);
+}
+
+async function getValueForSensor25(sensorPort, endpoint) {
+	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
+	const wordZero = parseInt(hexString.substring(0, 4), 16);
+	return (wordZero >> 2);
+}
+
+async function getValueForSensor48(sensorPort, endpoint) {
+	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
+	const flow = parseInt(hexString.substring(0, 4), 16);
+	const temperatureReturn = ((parseInt(hexString.substring(4, 8), 16)) >> 2);
+	return [flow, temperatureReturn];
 }
 
 class IoLinkMasterAl1370 extends utils.Adapter {
@@ -74,64 +107,127 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		const sleepTimer = this.config.sleepTimer;
 
 		// try {
-		// 	initHost(ipOfIOLink);
+		// 	//initHost(ipOfIOLink);
 		// } catch (error) {
 		// 	this.log.error('could not init IO Link: ' + error);
 		// }
 
-		// const sensorPortMap = getSensorPortMap(ipOfIOLink);
+		const sensorPortMap = await getSensorPortMap(ipOfIOLink);
 
-		let hostAlive = true;
+		const hostAlive = true;
 		while (hostAlive) {
-			let resultSensor135;
-			// checkIsHostAlive(ipOfIOLink);
-			// for (let [sensorPort, sensorId] of sensorPortMap) {
-			const sensorId = 135;
-			if (sensorId === 135) {
-				resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
-				const humidity = resultSensor135[0];
-				const temperature = resultSensor135[1];
-				await this.setObjectNotExists(`humidity135`, {
-					type: 'state',
-					common: {
-						name: 'Humidity135',
-						role: 'value.humidity135',
-						type: 'number',
-						value: humidity,
-						unit: '%',
-						read: true,
-						write: false
-					}
-				});
-				this.setState('humidity135', humidity, true);
+			const start = performance.now();
+			//checkIsHostAlive(ipOfIOLink);
+			for (const [sensorPort, sensorId] of sensorPortMap) {
+				if (sensorId === 135) {
+					const resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
+					const humidityRack = resultSensor135[0];
+					const temperatureRack = resultSensor135[1];
+					await this.setObjectNotExistsAsync('temperatureRack', {
+						type: 'state',
+						common: {
+							name: 'temperatureRack',
+							type: 'number',
+							role: 'value.temperatureRack',
+							unit: '°C',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					//TODO: identifier infront of all states to just subscribe to identifier.*
+					this.subscribeStates('temperatureRack');
+					await this.setStateAsync('temperatureRack', {val: temperatureRack, ack: true});
 
-				await this.setObjectNotExists(`temperature135`, {
-					type: 'state',
-					common: {
-						name: 'Temperature135',
-						role: 'value.temperature135',
-						type: 'number',
-						value: temperature,
-						unit: '%',
-						read: true,
-						write: false
-					}
-				});
-				this.setState('temperature135', temperature, true);
-				//adapter.setState(`${idProcessData}.humidity135`, humidity, true);
-			} else if (sensorId === 6) {
-				// getValueForSensor6(sensorPort, ipOfIOLink);
-			} else if (sensorId === 25) {
-				// getValueForSensor25(sensorPort, ipOfIOLink);
-			} else if (sensorId === 48) {
-				// getValueForSensor48(sensorPort, ipOfIOLink);
-			} else {
-				throw new Error('unidentified sensor');
+					await this.setObjectNotExistsAsync('humidityRack', {
+						type: 'state',
+						common: {
+							name: 'humidityRack',
+							type: 'number',
+							role: 'value.humidityRack',
+							unit: '%',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.subscribeStates('humidityRack');
+					await this.setStateAsync('humidityRack', {val: humidityRack, ack: true});
+				} else if (sensorId === 6) {
+					const temperatureFlow = await getValueForSensor6(sensorPort, ipOfIOLink);
+					await this.setObjectNotExistsAsync('temperatureFlow', {
+						type: 'state',
+						common: {
+							name: 'temperatureFlow',
+							type: 'number',
+							role: 'value.temperatureFlow',
+							unit: '°C',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.subscribeStates('temperatureFlow');
+					await this.setStateAsync('temperatureFlow', {val: temperatureFlow, ack: true});
+				} else if (sensorId === 25) {
+					const pressure = await getValueForSensor25(sensorPort, ipOfIOLink);
+					await this.setObjectNotExistsAsync('pressure', {
+						type: 'state',
+						common: {
+							name: 'Pressure',
+							type: 'number',
+							role: 'value.pressure',
+							unit: 'Bar?',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.subscribeStates('pressure');
+					await this.setStateAsync('pressure', {val: pressure, ack: true});
+				} else if (sensorId === 48) {
+					const resultSensor48 = await getValueForSensor48(sensorPort, ipOfIOLink);
+					const flow = resultSensor48[0];
+					const temperatureReturn = resultSensor48[1];
+
+					await this.setObjectNotExistsAsync('flow', {
+						type: 'state',
+						common: {
+							name: 'flow',
+							type: 'number',
+							role: 'value.flow',
+							unit: 'l/h?',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.subscribeStates('flow');
+					await this.setStateAsync('flow', {val: flow, ack: true});
+
+					await this.setObjectNotExistsAsync('temperatureReturn', {
+						type: 'state',
+						common: {
+							name: 'temperatureReturn',
+							type: 'number',
+							role: 'value.temperatureReturn',
+							unit: '°C',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.subscribeStates('temperatureReturn');
+					await this.setStateAsync('temperatureReturn', {val: temperatureReturn, ack: true});
+
+				} else {
+					throw new Error('unidentified sensor');
+				}
 			}
-			// }
-			this.log.info('alive');
-			this.log.info(resultSensor135[0]);
-			this.log.info(resultSensor135[1]);
+
+			const end = performance.now();
+			this.log.info('Finished run in: ' + (end - start) + 'ms');
+			this.log.info('Going to sleep now for: ' + sleepTimer + 'ms');
 			await sleep(sleepTimer);
 		}
 		/*
@@ -151,33 +247,33 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			native: {},
 		});
 
-		// In order to get state updates, you need to subscribe to them. The following line adds a subscription for our variable we have created above.
-		this.subscribeStates('testVariable');
-		// You can also add a subscription for multiple states. The following line watches all states starting with "lights."
-		// this.subscribeStates('lights.*');
-		// Or, if you really must, you can also watch all states. Don't do this if you don't need to. Otherwise this will cause a lot of unnecessary load on the system:
-		// this.subscribeStates('*');
-
-		/*
-			setState examples
-			you will notice that each setState will cause the stateChange event to fire (because of above subscribeStates cmd)
-		*/
-		// the variable testVariable is set to true as command (ack=false)
-		await this.setStateAsync('testVariable', true);
-
-		// same thing, but the value is flagged "ack"
-		// ack should be always set to true if the value is received from or acknowledged from the target system
-		await this.setStateAsync('testVariable', {val: true, ack: true});
-
-		// same thing, but the state is deleted after 30s (getState will return null afterwards)
-		await this.setStateAsync('testVariable', {val: true, ack: true, expire: 30});
-
-		// examples for the checkPassword/checkGroup functions
-		let result = await this.checkPasswordAsync('admin', 'iobroker');
-		this.log.info('check user admin pw iobroker: ' + result);
-
-		result = await this.checkGroupAsync('admin', 'admin');
-		this.log.info('check group user admin group admin: ' + result);
+		// // In order to get state updates, you need to subscribe to them. The following line adds a subscription for our variable we have created above.
+		// this.subscribeStates('testVariable');
+		// // You can also add a subscription for multiple states. The following line watches all states starting with "lights."
+		// // this.subscribeStates('lights.*');
+		// // Or, if you really must, you can also watch all states. Don't do this if you don't need to. Otherwise this will cause a lot of unnecessary load on the system:
+		// // this.subscribeStates('*');
+		//
+		// /*
+		// 	setState examples
+		// 	you will notice that each setState will cause the stateChange event to fire (because of above subscribeStates cmd)
+		// */
+		// // the variable testVariable is set to true as command (ack=false)
+		// await this.setStateAsync('testVariable', true);
+		//
+		// // same thing, but the value is flagged "ack"
+		// // ack should be always set to true if the value is received from or acknowledged from the target system
+		// await this.setStateAsync('testVariable', {val: true, ack: true});
+		//
+		// // same thing, but the state is deleted after 30s (getState will return null afterwards)
+		// await this.setStateAsync('testVariable', {val: true, ack: true, expire: 30});
+		//
+		// // examples for the checkPassword/checkGroup functions
+		// let result = await this.checkPasswordAsync('admin', 'iobroker');
+		// this.log.info('check user admin pw iobroker: ' + result);
+		//
+		// result = await this.checkGroupAsync('admin', 'admin');
+		// this.log.info('check group user admin group admin: ' + result);
 	}
 
 	/**
