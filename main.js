@@ -32,8 +32,6 @@ async function getValue(endpoint, requestBody) {
 		timeout: 8000,
 		data: requestBody,
 		headers: {'content-type': 'application/json'}
-	}).catch(function (error) {
-		throw new Error(error);
 	});
 	return res.data['data']['value'];
 }
@@ -84,9 +82,16 @@ async function checkIsHostAlive(endpoint) {
 	try {
 		await getValue(endpoint, getRequestBody(`/deviceinfo/productcode/getdata`));
 		return true;
-	} catch (error){
+	} catch (error) {
 		return false;
 	}
+}
+
+async function initHost(ipOfIOLink) {
+	if (await checkIsHostAlive(ipOfIOLink))
+		return true;
+	else
+		return false;
 }
 
 class IoLinkMasterAl1370 extends utils.Adapter {
@@ -112,18 +117,16 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 	async onReady() {
 
 		this.log.info('config option2: ' + this.config.ioLinkIp);
-		const ipOfIOLink = this.config.ioLinkIp;
-		const sleepTimer = this.config.sleepTimer;
+		const ipOfIOLink = this.config.ioLinkIp, sleepTimer = this.config.sleepTimer;
+		const hostAlive = true;
 
-		// try {
-		// 	//initHost(ipOfIOLink);
-		// } catch (error) {
-		// 	this.log.error('could not init IO Link: ' + error);
-		// }
+		if (!(await initHost(ipOfIOLink))){
+			this.log.error('Could not initialise Host! Shutting adapter down!');
+			this.stop;
+		}
+
 
 		const sensorPortMap = await getSensorPortMap(ipOfIOLink);
-
-		const hostAlive = true;
 		while (hostAlive) {
 			const start = performance.now();
 			let tempFlow = null;
@@ -140,10 +143,14 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				native: {},
 			});
 			this.subscribeStates('isHostAlive');
-			if(await checkIsHostAlive(ipOfIOLink)){
-				await this.setStateAsync('isHostAlive', {val: true, ack: true});
-				const test = await this.getStateAsync('isHostAlive');
-				this.log.debug('INFO! ' + test.val);
+			if (await checkIsHostAlive(ipOfIOLink)) {
+				const getLastState = await this.getStateAsync('isHostAlive');
+				if (getLastState == null) {
+					await this.setStateAsync('isHostAlive', {val: true, ack: true});
+				} else {
+					if (getLastState.val === false)
+						await this.setStateAsync('isHostAlive', {val: true, ack: true});
+				}
 			} else {
 				await this.setStateAsync('isHostAlive', {val: false, ack: true});
 			}
