@@ -76,7 +76,7 @@ async function getValueForSensor25(sensorPort, endpoint) {
 async function getValueForSensor48(sensorPort, endpoint) {
 	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
 	const flow = parseInt(hexString.substring(0, 4), 16);
-	const temperatureReturn = ((parseInt(hexString.substring(4, 8), 16)) >> 2);
+	const temperatureReturn = ((parseInt(hexString.substring(4, 8), 16)) >> 2) * 0.1;
 	return [flow, temperatureReturn];
 }
 
