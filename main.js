@@ -80,6 +80,15 @@ async function getValueForSensor48(sensorPort, endpoint) {
 	return [flow, temperatureReturn];
 }
 
+async function checkIsHostAlive(endpoint) {
+	try {
+		await getValue(endpoint, getRequestBody(`/deviceinfo/productcode/getdata`));
+		return true;
+	} catch (error){
+		return false;
+	}
+}
+
 class IoLinkMasterAl1370 extends utils.Adapter {
 
 	/**
@@ -119,7 +128,23 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			const start = performance.now();
 			let tempFlow = null;
 			let tempReturn = null;
-			//checkIsHostAlive(ipOfIOLink);
+			await this.setObjectNotExistsAsync('isHostAlive', {
+				type: 'state',
+				common: {
+					name: 'isHostAlive',
+					type: 'boolean',
+					role: 'value.isHostAlive',
+					read: true,
+					write: false,
+				},
+				native: {},
+			});
+			this.subscribeStates('isHostAlive');
+			if(await checkIsHostAlive(ipOfIOLink)){
+				await this.setStateAsync('isHostAlive', {val: true, ack: true});
+			} else {
+				await this.setStateAsync('isHostAlive', {val: false, ack: true});
+			}
 			for (const [sensorPort, sensorId] of sensorPortMap) {
 				if (sensorId === 135) {
 					const resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
