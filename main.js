@@ -117,6 +117,8 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		const hostAlive = true;
 		while (hostAlive) {
 			const start = performance.now();
+			let tempFlow = null;
+			let tempReturn = null;
 			//checkIsHostAlive(ipOfIOLink);
 			for (const [sensorPort, sensorId] of sensorPortMap) {
 				if (sensorId === 135) {
@@ -155,6 +157,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					await this.setStateAsync('humidityRack', {val: humidityRack, ack: true});
 				} else if (sensorId === 6) {
 					const temperatureFlow = await getValueForSensor6(sensorPort, ipOfIOLink);
+					tempFlow = temperatureFlow;
 					await this.setObjectNotExistsAsync('temperatureFlow', {
 						type: 'state',
 						common: {
@@ -189,6 +192,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					const resultSensor48 = await getValueForSensor48(sensorPort, ipOfIOLink);
 					const flow = resultSensor48[0];
 					const temperatureReturn = resultSensor48[1];
+					tempReturn = temperatureReturn;
 
 					await this.setObjectNotExistsAsync('flow', {
 						type: 'state',
@@ -223,6 +227,25 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				} else {
 					throw new Error('unidentified sensor');
 				}
+			}
+
+			if (tempFlow != null && tempReturn != null) {
+				const temperatureDelta = tempReturn - tempFlow;
+
+				await this.setObjectNotExistsAsync('temperatureDelta', {
+					type: 'state',
+					common: {
+						name: 'temperatureDelta',
+						type: 'number',
+						role: 'value.temperatureDelta',
+						unit: '°C',
+						read: true,
+						write: false,
+					},
+					native: {},
+				});
+				this.subscribeStates('temperatureDelta');
+				await this.setStateAsync('temperatureDelta', {val: temperatureDelta, ack: true});
 			}
 
 			const end = performance.now();
