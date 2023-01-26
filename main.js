@@ -143,7 +143,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			if(await checkIsHostAlive(ipOfIOLink)){
 				await this.setStateAsync('isHostAlive', {val: true, ack: true});
 				const test = await this.getStateAsync('isHostAlive');
-				this.log.debug('INFO! ' + test);
+				this.log.debug('INFO! ' + test.val);
 			} else {
 				await this.setStateAsync('isHostAlive', {val: false, ack: true});
 			}
