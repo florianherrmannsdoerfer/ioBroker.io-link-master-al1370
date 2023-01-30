@@ -46,14 +46,26 @@ async function getSensorPortMap(ipOfIOLink) {
 	return sensorIdPortMap;
 }
 
+function roundNumberTwoDigits(number){
+	return (Math.round(number * 100)/100).toFixed(2);
+}
+
+function parseHexToInt16(number){
+	const int16 = parseInt(number, 16);
+	if ((int16 & 0x8000) > 0){
+		return (int16 - 0x10000);
+	}
+	return int16;
+}
+
 async function getValueForSensor135(sensorPort, endpoint) {
 	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
 	const humiditySub = hexString.substring(0, 4);
-	let humidity = parseInt(humiditySub, 16);
+	let humidity = parseHexToInt16(humiditySub);
 	humidity = humidity * 0.1;
 
 	const tempSub = hexString.substring(8, 12);
-	let temp = parseInt(tempSub, 16);
+	let temp = parseHexToInt16(tempSub);
 	temp = temp * 0.1;
 
 	return [humidity, temp];
@@ -61,7 +73,7 @@ async function getValueForSensor135(sensorPort, endpoint) {
 
 async function getValueForSensor6(sensorPort, endpoint) {
 	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
-	const temperatureFlow = parseInt(hexString, 16);
+	const temperatureFlow = parseHexToInt16(hexString);
 	return (temperatureFlow * 0.1);
 }
 
@@ -73,7 +85,7 @@ async function getValueForSensor25(sensorPort, endpoint) {
 
 async function getValueForSensor48(sensorPort, endpoint) {
 	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
-	const flow = parseInt(hexString.substring(0, 4), 16);
+	const flow = parseHexToInt16(hexString.substring(0, 4));
 	const temperatureReturn = ((parseInt(hexString.substring(4, 8), 16)) >> 2) * 0.1;
 	return [flow, temperatureReturn];
 }
@@ -153,6 +165,9 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				}
 			} else {
 				await this.setStateAsync('isHostAlive', {val: false, ack: true});
+				this.log.error('Host went down! Trying again in: ' + sleepTimer + 'ms');
+				await sleep(sleepTimer);
+				continue;
 			}
 			for (const [sensorPort, sensorId] of sensorPortMap) {
 				if (sensorId === 135) {
@@ -173,7 +188,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					});
 					//TODO: identifier infront of all states to just subscribe to identifier.*
 					this.subscribeStates('temperatureRack');
-					await this.setStateAsync('temperatureRack', {val: temperatureRack, ack: true});
+					await this.setStateAsync('temperatureRack', {val: roundNumberTwoDigits(temperatureRack), ack: true});
 
 					await this.setObjectNotExistsAsync('humidityRack', {
 						type: 'state',
@@ -188,7 +203,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						native: {},
 					});
 					this.subscribeStates('humidityRack');
-					await this.setStateAsync('humidityRack', {val: humidityRack, ack: true});
+					await this.setStateAsync('humidityRack', {val: roundNumberTwoDigits(humidityRack), ack: true});
 				} else if (sensorId === 6) {
 					const temperatureFlow = await getValueForSensor6(sensorPort, ipOfIOLink);
 					tempFlow = temperatureFlow;
@@ -205,7 +220,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						native: {},
 					});
 					this.subscribeStates('temperatureFlow');
-					await this.setStateAsync('temperatureFlow', {val: temperatureFlow, ack: true});
+					await this.setStateAsync('temperatureFlow', {val: roundNumberTwoDigits(temperatureFlow), ack: true});
 				} else if (sensorId === 25) {
 					const pressure = await getValueForSensor25(sensorPort, ipOfIOLink);
 					await this.setObjectNotExistsAsync('pressure', {
@@ -221,8 +236,9 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						native: {},
 					});
 					this.subscribeStates('pressure');
-					await this.setStateAsync('pressure', {val: pressure, ack: true});
+					await this.setStateAsync('pressure', {val: roundNumberTwoDigits(pressure), ack: true});
 				} else if (sensorId === 48) {
+					//TODO: handel ul ol thingy
 					const resultSensor48 = await getValueForSensor48(sensorPort, ipOfIOLink);
 					const flow = resultSensor48[0];
 					const temperatureReturn = resultSensor48[1];
@@ -241,7 +257,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						native: {},
 					});
 					this.subscribeStates('flow');
-					await this.setStateAsync('flow', {val: flow, ack: true});
+					await this.setStateAsync('flow', {val: roundNumberTwoDigits(flow), ack: true});
 
 					await this.setObjectNotExistsAsync('temperatureReturn', {
 						type: 'state',
@@ -256,7 +272,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						native: {},
 					});
 					this.subscribeStates('temperatureReturn');
-					await this.setStateAsync('temperatureReturn', {val: temperatureReturn, ack: true});
+					await this.setStateAsync('temperatureReturn', {val: roundNumberTwoDigits(temperatureReturn), ack: true});
 
 				} else {
 					throw new Error('unidentified sensor');
@@ -279,7 +295,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					native: {},
 				});
 				this.subscribeStates('temperatureDelta');
-				await this.setStateAsync('temperatureDelta', {val: temperatureDelta, ack: true});
+				await this.setStateAsync('temperatureDelta', {val: roundNumberTwoDigits(temperatureDelta), ack: true});
 			}
 
 			const end = performance.now();
