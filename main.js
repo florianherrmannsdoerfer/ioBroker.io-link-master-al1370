@@ -40,8 +40,8 @@ async function getSensorPortMap(ipOfIOLink) {
 	const sensorIdPortMap = new Map();
 	for (let i = 1; i <= numberOfPorts; i++) {
 		const sensorPort = i;
-		const sensorId = await getValue(ipOfIOLink, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/deviceid/getdata`));
-		sensorIdPortMap.set(sensorPort, sensorId);
+		const productName = await getValue(ipOfIOLink, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/productname/getdata`));
+		sensorIdPortMap.set(sensorPort, productName);
 	}
 	return sensorIdPortMap;
 }
@@ -169,9 +169,9 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				await sleep(sleepTimer);
 				continue;
 			}
-			for (const [sensorPort, sensorId] of sensorPortMap) {
-				this.log.info(sensorId);
-				if (sensorId === 135) {
+			for (const [sensorPort, productName] of sensorPortMap) {
+				this.log.info(productName);
+				if (productName === 'AH002') {
 					const resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
 					const humidityRack = resultSensor135[0];
 					const temperatureRack = resultSensor135[1];
@@ -205,7 +205,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					});
 					this.subscribeStates('humidityRack');
 					await this.setStateAsync('humidityRack', {val: roundNumberTwoDigits(humidityRack), ack: true});
-				} else if (sensorId === 6) {
+				} else if (productName === 'AT001') {
 					const temperatureFlow = await getValueForSensor6(sensorPort, ipOfIOLink);
 					tempFlow = temperatureFlow;
 					await this.setObjectNotExistsAsync('temperatureFlow', {
@@ -222,7 +222,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					});
 					this.subscribeStates('temperatureFlow');
 					await this.setStateAsync('temperatureFlow', {val: roundNumberTwoDigits(temperatureFlow), ack: true});
-				} else if (sensorId === 25) {
+				} else if (productName === 'AP011') {
 					const pressure = await getValueForSensor25(sensorPort, ipOfIOLink);
 					await this.setObjectNotExistsAsync('pressure', {
 						type: 'state',
@@ -238,7 +238,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					});
 					this.subscribeStates('pressure');
 					await this.setStateAsync('pressure', {val: roundNumberTwoDigits(pressure), ack: true});
-				} else if (sensorId === 48) {
+				} else if (productName === 'AS005_LIQU') {
 					//TODO: handel ul ol thingy
 					const resultSensor48 = await getValueForSensor48(sensorPort, ipOfIOLink);
 					const flow = resultSensor48[0];
