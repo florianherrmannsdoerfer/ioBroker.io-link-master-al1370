@@ -170,6 +170,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				continue;
 			}
 			for (const [sensorPort, sensorId] of sensorPortMap) {
+				this.log.info(sensorId);
 				if (sensorId === 135) {
 					const resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
 					const humidityRack = resultSensor135[0];
