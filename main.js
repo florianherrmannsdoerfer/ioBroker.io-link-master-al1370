@@ -47,7 +47,7 @@ async function getSensorPortMap(ipOfIOLink) {
 }
 
 function roundNumberTwoDigits(number){
-	return (Math.round(number * 100)/100).toFixed(2);
+	return Number((Math.round(number * 100)/100).toFixed(2));
 }
 
 function parseHexToInt16(number){
