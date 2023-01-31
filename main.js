@@ -12,9 +12,15 @@ const utils = require('@iobroker/adapter-core');
 // const fs = require("fs");
 const axios = require('axios');
 const {performance} = require('perf_hooks');
+const CONFIG = require('./config.json');
 
-//global variables
-const numberOfPorts = 4;
+
+class UnidentifiedSensorError extends Error {
+	constructor(message) {
+		super(message);
+		this.name = 'UnidentifiedSensorError';
+	}
+}
 
 function sleep(ms) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -38,21 +44,24 @@ async function getValue(endpoint, requestBody) {
 
 async function getSensorPortMap(ipOfIOLink) {
 	const sensorIdPortMap = new Map();
-	for (let i = 1; i <= numberOfPorts; i++) {
+	for (let i = 1; i <= CONFIG.Ports; i++) {
 		const sensorPort = i;
 		const productName = await getValue(ipOfIOLink, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/productname/getdata`));
-		sensorIdPortMap.set(sensorPort, productName);
+		if (CONFIG.Sensors.includes(productName))
+			sensorIdPortMap.set(sensorPort, productName);
+		else
+			throw new UnidentifiedSensorError('Could not find Sensor: ' + productName + ' in Config!');
 	}
 	return sensorIdPortMap;
 }
 
-function roundNumberTwoDigits(number){
-	return Number((Math.round(number * 100)/100).toFixed(2));
+function roundNumberTwoDigits(number) {
+	return Number((Math.round(number * 100) / 100).toFixed(2));
 }
 
-function parseHexToInt16(number){
+function parseHexToInt16(number) {
 	const int16 = parseInt(number, 16);
-	if ((int16 & 0x8000) > 0){
+	if ((int16 & 0x8000) > 0) {
 		return (int16 - 0x10000);
 	}
 	return int16;
@@ -132,13 +141,46 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		const ipOfIOLink = this.config.ioLinkIp, sleepTimer = this.config.sleepTimer;
 		const hostAlive = true;
 
-		if (!(await initHost(ipOfIOLink))){
+		if (!(await initHost(ipOfIOLink))) {
 			this.log.error('Could not initialise Host! Shutting adapter down!');
 			this.stop;
 		}
 
+		const prefix = 'Ports';
+		await this.setObjectNotExistsAsync(prefix, {
+			type: 'channel',
+			common: {
+				name: 'Sensors',
+			},
+			native: {},
+		});
 
-		const sensorPortMap = await getSensorPortMap(ipOfIOLink);
+		let sensorPortMap;
+		await getSensorPortMap(ipOfIOLink)
+			.then(sensorPortMapReturn => {
+				sensorPortMap = sensorPortMapReturn;
+				sensorPortMap.forEach((value, key) => {
+					this.setObjectNotExists(`${prefix}.Port${key}`, {
+						type: 'state',
+						common: {
+							name: `Port${key}`,
+							type: 'string',
+							role: 'value.SensorName',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.setState(`${prefix}.Port${key}`, {
+						val: value,
+						ack: true
+					});
+				});
+			})
+			.catch(err => this.log.error(err))
+			.finally(() => {
+				this.log.warn('Please check the sensors or config!');
+			});
 		while (hostAlive) {
 			const start = performance.now();
 			let tempFlow = null;
@@ -189,7 +231,10 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					});
 					//TODO: identifier infront of all states to just subscribe to identifier.*
 					this.subscribeStates('temperatureRack');
-					await this.setStateAsync('temperatureRack', {val: roundNumberTwoDigits(temperatureRack), ack: true});
+					await this.setStateAsync('temperatureRack', {
+						val: roundNumberTwoDigits(temperatureRack),
+						ack: true
+					});
 
 					await this.setObjectNotExistsAsync('humidityRack', {
 						type: 'state',
@@ -221,7 +266,10 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						native: {},
 					});
 					this.subscribeStates('temperatureFlow');
-					await this.setStateAsync('temperatureFlow', {val: roundNumberTwoDigits(temperatureFlow), ack: true});
+					await this.setStateAsync('temperatureFlow', {
+						val: roundNumberTwoDigits(temperatureFlow),
+						ack: true
+					});
 				} else if (productName === 'AP011') {
 					const pressure = await getValueForSensor25(sensorPort, ipOfIOLink);
 					await this.setObjectNotExistsAsync('pressure', {
@@ -273,7 +321,10 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						native: {},
 					});
 					this.subscribeStates('temperatureReturn');
-					await this.setStateAsync('temperatureReturn', {val: roundNumberTwoDigits(temperatureReturn), ack: true});
+					await this.setStateAsync('temperatureReturn', {
+						val: roundNumberTwoDigits(temperatureReturn),
+						ack: true
+					});
 
 				} else {
 					throw new Error('unidentified sensor');
