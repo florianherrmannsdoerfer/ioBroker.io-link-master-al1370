@@ -16,9 +16,10 @@ const CONFIG = require('./config.js');
 
 
 class UnidentifiedSensorError extends Error {
-	constructor(message) {
+	constructor(message, sensorName) {
 		super(message);
 		this.name = 'UnidentifiedSensorError';
+		this.sensorName = sensorName;
 	}
 }
 
@@ -50,7 +51,7 @@ async function getSensorPortMap(ipOfIOLink) {
 		if (CONFIG.sensors.includes(productName))
 			sensorIdPortMap.set(sensorPort, productName);
 		else
-			throw new UnidentifiedSensorError('Could not find Sensor: ' + productName + ' in Config!');
+			throw new UnidentifiedSensorError('Could not find Sensor: ' + productName + ' in Config!', productName);
 	}
 	return sensorIdPortMap;
 }
@@ -137,7 +138,6 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 	 */
 	async onReady() {
 
-		this.log.info('config option2: ' + this.config.ioLinkIp);
 		const ipOfIOLink = this.config.ioLinkIp, sleepTimer = this.config.sleepTimer;
 		const hostAlive = true;
 
@@ -146,8 +146,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			this.stop;
 		}
 
-		const prefix = 'Ports';
-		await this.setObjectNotExistsAsync(prefix, {
+		await this.setObjectNotExistsAsync(CONFIG.prefixPorts, {
 			type: 'channel',
 			common: {
 				name: 'Sensors',
@@ -155,33 +154,6 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			native: {},
 		});
 
-		// let sensorPortMap = null;
-		// await getSensorPortMap(ipOfIOLink)
-		// 	.then(sensorPortMapReturn => {
-		// 		this.log.info('test');
-		// 		sensorPortMap = sensorPortMapReturn;
-		// 		sensorPortMap.forEach((value, key) => {
-		// 			this.setObjectNotExists(`${prefix}.Port${key}`, {
-		// 				type: 'state',
-		// 				common: {
-		// 					name: `Port${key}`,
-		// 					type: 'string',
-		// 					role: 'value.SensorName',
-		// 					read: true,
-		// 					write: false,
-		// 				},
-		// 				native: {},
-		// 			});
-		// 			this.setState(`${prefix}.Port${key}`, {
-		// 				val: value,
-		// 				ack: true
-		// 			});
-		// 		});
-		// 	})
-		// 	.catch(err => this.log.error(err))
-		// 	.finally(() => {
-		// 		this.log.warn('Please check the sensors or config!');
-		// 	});
 		while (hostAlive) {
 			const start = performance.now();
 			let tempFlow = null;
@@ -212,9 +184,10 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				await sleep(sleepTimer);
 				continue;
 			}
+
 			await getSensorPortMap(ipOfIOLink).then(async (sensorPortMap) => {
 				for (const [sensorPort, productName] of sensorPortMap) {
-					this.setObjectNotExists(`${prefix}.Port${sensorPort}`, {
+					this.setObjectNotExists(`${CONFIG.prefixPorts}.Port${sensorPort}`, {
 						type: 'device',
 						common: {
 							name: `Port${sensorPort}`,
@@ -225,7 +198,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						},
 						native: {},
 					});
-					this.setState(`${prefix}.Port${sensorPort}`, {
+					this.setState(`${CONFIG.prefixPorts}.Port${sensorPort}`, {
 						val: productName,
 						ack: true
 					});
@@ -348,125 +321,6 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				}
 
 			});
-			// for (const [sensorPort, productName] of sensorPortMap) {
-			// 	this.log.info(productName);
-			// 	if (productName === 'AH002') {
-			// 		const resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
-			// 		const humidityRack = resultSensor135[0];
-			// 		const temperatureRack = resultSensor135[1];
-			// 		await this.setObjectNotExistsAsync('temperatureRack', {
-			// 			type: 'state',
-			// 			common: {
-			// 				name: 'temperatureRack',
-			// 				type: 'number',
-			// 				role: 'value.temperatureRack',
-			// 				unit: '°C',
-			// 				read: true,
-			// 				write: false,
-			// 			},
-			// 			native: {},
-			// 		});
-			// 		//TODO: identifier infront of all states to just subscribe to identifier.*
-			// 		this.subscribeStates('temperatureRack');
-			// 		await this.setStateAsync('temperatureRack', {
-			// 			val: roundNumberTwoDigits(temperatureRack),
-			// 			ack: true
-			// 		});
-			//
-			// 		await this.setObjectNotExistsAsync('humidityRack', {
-			// 			type: 'state',
-			// 			common: {
-			// 				name: 'humidityRack',
-			// 				type: 'number',
-			// 				role: 'value.humidityRack',
-			// 				unit: '%',
-			// 				read: true,
-			// 				write: false,
-			// 			},
-			// 			native: {},
-			// 		});
-			// 		this.subscribeStates('humidityRack');
-			// 		await this.setStateAsync('humidityRack', {val: roundNumberTwoDigits(humidityRack), ack: true});
-			// 	} else if (productName === 'AT001') {
-			// 		const temperatureFlow = await getValueForSensor6(sensorPort, ipOfIOLink);
-			// 		tempFlow = temperatureFlow;
-			// 		await this.setObjectNotExistsAsync('temperatureFlow', {
-			// 			type: 'state',
-			// 			common: {
-			// 				name: 'temperatureFlow',
-			// 				type: 'number',
-			// 				role: 'value.temperatureFlow',
-			// 				unit: '°C',
-			// 				read: true,
-			// 				write: false,
-			// 			},
-			// 			native: {},
-			// 		});
-			// 		this.subscribeStates('temperatureFlow');
-			// 		await this.setStateAsync('temperatureFlow', {
-			// 			val: roundNumberTwoDigits(temperatureFlow),
-			// 			ack: true
-			// 		});
-			// 	} else if (productName === 'AP011') {
-			// 		const pressure = await getValueForSensor25(sensorPort, ipOfIOLink);
-			// 		await this.setObjectNotExistsAsync('pressure', {
-			// 			type: 'state',
-			// 			common: {
-			// 				name: 'Pressure',
-			// 				type: 'number',
-			// 				role: 'value.pressure',
-			// 				unit: 'Bar',
-			// 				read: true,
-			// 				write: false,
-			// 			},
-			// 			native: {},
-			// 		});
-			// 		this.subscribeStates('pressure');
-			// 		await this.setStateAsync('pressure', {val: roundNumberTwoDigits(pressure), ack: true});
-			// 	} else if (productName === 'AS005_LIQU') {
-			// 		//TODO: handel ul ol thingy
-			// 		const resultSensor48 = await getValueForSensor48(sensorPort, ipOfIOLink);
-			// 		const flow = resultSensor48[0];
-			// 		const temperatureReturn = resultSensor48[1];
-			// 		tempReturn = temperatureReturn;
-			//
-			// 		await this.setObjectNotExistsAsync('flow', {
-			// 			type: 'state',
-			// 			common: {
-			// 				name: 'flow',
-			// 				type: 'number',
-			// 				role: 'value.flow',
-			// 				unit: 'l/h',
-			// 				read: true,
-			// 				write: false,
-			// 			},
-			// 			native: {},
-			// 		});
-			// 		this.subscribeStates('flow');
-			// 		await this.setStateAsync('flow', {val: roundNumberTwoDigits(flow), ack: true});
-			//
-			// 		await this.setObjectNotExistsAsync('temperatureReturn', {
-			// 			type: 'state',
-			// 			common: {
-			// 				name: 'temperatureReturn',
-			// 				type: 'number',
-			// 				role: 'value.temperatureReturn',
-			// 				unit: '°C',
-			// 				read: true,
-			// 				write: false,
-			// 			},
-			// 			native: {},
-			// 		});
-			// 		this.subscribeStates('temperatureReturn');
-			// 		await this.setStateAsync('temperatureReturn', {
-			// 			val: roundNumberTwoDigits(temperatureReturn),
-			// 			ack: true
-			// 		});
-			//
-			// 	} else {
-			// 		throw new Error('unidentified sensor');
-			// 	}
-			// }
 
 			if (tempFlow != null && tempReturn != null) {
 				const temperatureDelta = tempReturn - tempFlow;
@@ -492,50 +346,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			this.log.info('Going to sleep now for: ' + sleepTimer + 'ms');
 			await sleep(sleepTimer);
 		}
-		/*
-		For every state in the system there has to be also an object of type state
-		Here a simple template for a boolean variable named "testVariable"
-		Because every adapter instance uses its own unique namespace variable names can't collide with other adapters variables
-		*/
-		await this.setObjectNotExistsAsync('testVariable', {
-			type: 'state',
-			common: {
-				name: 'testVariable',
-				type: 'boolean',
-				role: 'indicator',
-				read: true,
-				write: true,
-			},
-			native: {},
-		});
 
-		// // In order to get state updates, you need to subscribe to them. The following line adds a subscription for our variable we have created above.
-		// this.subscribeStates('testVariable');
-		// // You can also add a subscription for multiple states. The following line watches all states starting with "lights."
-		// // this.subscribeStates('lights.*');
-		// // Or, if you really must, you can also watch all states. Don't do this if you don't need to. Otherwise this will cause a lot of unnecessary load on the system:
-		// // this.subscribeStates('*');
-		//
-		// /*
-		// 	setState examples
-		// 	you will notice that each setState will cause the stateChange event to fire (because of above subscribeStates cmd)
-		// */
-		// // the variable testVariable is set to true as command (ack=false)
-		// await this.setStateAsync('testVariable', true);
-		//
-		// // same thing, but the value is flagged "ack"
-		// // ack should be always set to true if the value is received from or acknowledged from the target system
-		// await this.setStateAsync('testVariable', {val: true, ack: true});
-		//
-		// // same thing, but the state is deleted after 30s (getState will return null afterwards)
-		// await this.setStateAsync('testVariable', {val: true, ack: true, expire: 30});
-		//
-		// // examples for the checkPassword/checkGroup functions
-		// let result = await this.checkPasswordAsync('admin', 'iobroker');
-		// this.log.info('check user admin pw iobroker: ' + result);
-		//
-		// result = await this.checkGroupAsync('admin', 'admin');
-		// this.log.info('check group user admin group admin: ' + result);
 	}
 
 	/**

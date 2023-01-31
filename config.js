@@ -5,5 +5,6 @@ module.exports = {
 		'AP011',
 		'AT001',
 		'AH002'
-	]
+	],
+	prefixPorts: 'Ports'
 };
