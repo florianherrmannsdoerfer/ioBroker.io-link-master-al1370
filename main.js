@@ -155,33 +155,33 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			native: {},
 		});
 
-		let sensorPortMap = null;
-		await getSensorPortMap(ipOfIOLink)
-			.then(sensorPortMapReturn => {
-				this.log.info('test');
-				sensorPortMap = sensorPortMapReturn;
-				sensorPortMap.forEach((value, key) => {
-					this.setObjectNotExists(`${prefix}.Port${key}`, {
-						type: 'state',
-						common: {
-							name: `Port${key}`,
-							type: 'string',
-							role: 'value.SensorName',
-							read: true,
-							write: false,
-						},
-						native: {},
-					});
-					this.setState(`${prefix}.Port${key}`, {
-						val: value,
-						ack: true
-					});
-				});
-			})
-			.catch(err => this.log.error(err))
-			.finally(() => {
-				this.log.warn('Please check the sensors or config!');
-			});
+		// let sensorPortMap = null;
+		// await getSensorPortMap(ipOfIOLink)
+		// 	.then(sensorPortMapReturn => {
+		// 		this.log.info('test');
+		// 		sensorPortMap = sensorPortMapReturn;
+		// 		sensorPortMap.forEach((value, key) => {
+		// 			this.setObjectNotExists(`${prefix}.Port${key}`, {
+		// 				type: 'state',
+		// 				common: {
+		// 					name: `Port${key}`,
+		// 					type: 'string',
+		// 					role: 'value.SensorName',
+		// 					read: true,
+		// 					write: false,
+		// 				},
+		// 				native: {},
+		// 			});
+		// 			this.setState(`${prefix}.Port${key}`, {
+		// 				val: value,
+		// 				ack: true
+		// 			});
+		// 		});
+		// 	})
+		// 	.catch(err => this.log.error(err))
+		// 	.finally(() => {
+		// 		this.log.warn('Please check the sensors or config!');
+		// 	});
 		while (hostAlive) {
 			const start = performance.now();
 			let tempFlow = null;
@@ -212,126 +212,248 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				await sleep(sleepTimer);
 				continue;
 			}
-			sensorPortMap.forEach((value, key) => this.log.warn(value + " \t" + key));
-			for (const [sensorPort, productName] of sensorPortMap) {
-				this.log.info(productName);
-				if (productName === 'AH002') {
-					const resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
-					const humidityRack = resultSensor135[0];
-					const temperatureRack = resultSensor135[1];
-					await this.setObjectNotExistsAsync('temperatureRack', {
-						type: 'state',
-						common: {
-							name: 'temperatureRack',
-							type: 'number',
-							role: 'value.temperatureRack',
-							unit: '°C',
-							read: true,
-							write: false,
-						},
-						native: {},
-					});
-					//TODO: identifier infront of all states to just subscribe to identifier.*
-					this.subscribeStates('temperatureRack');
-					await this.setStateAsync('temperatureRack', {
-						val: roundNumberTwoDigits(temperatureRack),
-						ack: true
-					});
+			await getSensorPortMap(ipOfIOLink).then(async (sensorPortMap) => {
 
-					await this.setObjectNotExistsAsync('humidityRack', {
-						type: 'state',
-						common: {
-							name: 'humidityRack',
-							type: 'number',
-							role: 'value.humidityRack',
-							unit: '%',
-							read: true,
-							write: false,
-						},
-						native: {},
-					});
-					this.subscribeStates('humidityRack');
-					await this.setStateAsync('humidityRack', {val: roundNumberTwoDigits(humidityRack), ack: true});
-				} else if (productName === 'AT001') {
-					const temperatureFlow = await getValueForSensor6(sensorPort, ipOfIOLink);
-					tempFlow = temperatureFlow;
-					await this.setObjectNotExistsAsync('temperatureFlow', {
-						type: 'state',
-						common: {
-							name: 'temperatureFlow',
-							type: 'number',
-							role: 'value.temperatureFlow',
-							unit: '°C',
-							read: true,
-							write: false,
-						},
-						native: {},
-					});
-					this.subscribeStates('temperatureFlow');
-					await this.setStateAsync('temperatureFlow', {
-						val: roundNumberTwoDigits(temperatureFlow),
-						ack: true
-					});
-				} else if (productName === 'AP011') {
-					const pressure = await getValueForSensor25(sensorPort, ipOfIOLink);
-					await this.setObjectNotExistsAsync('pressure', {
-						type: 'state',
-						common: {
-							name: 'Pressure',
-							type: 'number',
-							role: 'value.pressure',
-							unit: 'Bar',
-							read: true,
-							write: false,
-						},
-						native: {},
-					});
-					this.subscribeStates('pressure');
-					await this.setStateAsync('pressure', {val: roundNumberTwoDigits(pressure), ack: true});
-				} else if (productName === 'AS005_LIQU') {
-					//TODO: handel ul ol thingy
-					const resultSensor48 = await getValueForSensor48(sensorPort, ipOfIOLink);
-					const flow = resultSensor48[0];
-					const temperatureReturn = resultSensor48[1];
-					tempReturn = temperatureReturn;
+				for (const [sensorPort, productName] of sensorPortMap) {
+					this.log.info(productName);
+					if (productName === 'AH002') {
+						const resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
+						const humidityRack = resultSensor135[0];
+						const temperatureRack = resultSensor135[1];
+						await this.setObjectNotExistsAsync('temperatureRack', {
+							type: 'state',
+							common: {
+								name: 'temperatureRack',
+								type: 'number',
+								role: 'value.temperatureRack',
+								unit: '°C',
+								read: true,
+								write: false,
+							},
+							native: {},
+						});
+						//TODO: identifier infront of all states to just subscribe to identifier.*
+						this.subscribeStates('temperatureRack');
+						await this.setStateAsync('temperatureRack', {
+							val: roundNumberTwoDigits(temperatureRack),
+							ack: true
+						});
 
-					await this.setObjectNotExistsAsync('flow', {
-						type: 'state',
-						common: {
-							name: 'flow',
-							type: 'number',
-							role: 'value.flow',
-							unit: 'l/h',
-							read: true,
-							write: false,
-						},
-						native: {},
-					});
-					this.subscribeStates('flow');
-					await this.setStateAsync('flow', {val: roundNumberTwoDigits(flow), ack: true});
+						await this.setObjectNotExistsAsync('humidityRack', {
+							type: 'state',
+							common: {
+								name: 'humidityRack',
+								type: 'number',
+								role: 'value.humidityRack',
+								unit: '%',
+								read: true,
+								write: false,
+							},
+							native: {},
+						});
+						this.subscribeStates('humidityRack');
+						await this.setStateAsync('humidityRack', {val: roundNumberTwoDigits(humidityRack), ack: true});
+					} else if (productName === 'AT001') {
+						const temperatureFlow = await getValueForSensor6(sensorPort, ipOfIOLink);
+						tempFlow = temperatureFlow;
+						await this.setObjectNotExistsAsync('temperatureFlow', {
+							type: 'state',
+							common: {
+								name: 'temperatureFlow',
+								type: 'number',
+								role: 'value.temperatureFlow',
+								unit: '°C',
+								read: true,
+								write: false,
+							},
+							native: {},
+						});
+						this.subscribeStates('temperatureFlow');
+						await this.setStateAsync('temperatureFlow', {
+							val: roundNumberTwoDigits(temperatureFlow),
+							ack: true
+						});
+					} else if (productName === 'AP011') {
+						const pressure = await getValueForSensor25(sensorPort, ipOfIOLink);
+						await this.setObjectNotExistsAsync('pressure', {
+							type: 'state',
+							common: {
+								name: 'Pressure',
+								type: 'number',
+								role: 'value.pressure',
+								unit: 'Bar',
+								read: true,
+								write: false,
+							},
+							native: {},
+						});
+						this.subscribeStates('pressure');
+						await this.setStateAsync('pressure', {val: roundNumberTwoDigits(pressure), ack: true});
+					} else if (productName === 'AS005_LIQU') {
+						//TODO: handel ul ol thingy
+						const resultSensor48 = await getValueForSensor48(sensorPort, ipOfIOLink);
+						const flow = resultSensor48[0];
+						const temperatureReturn = resultSensor48[1];
+						tempReturn = temperatureReturn;
 
-					await this.setObjectNotExistsAsync('temperatureReturn', {
-						type: 'state',
-						common: {
-							name: 'temperatureReturn',
-							type: 'number',
-							role: 'value.temperatureReturn',
-							unit: '°C',
-							read: true,
-							write: false,
-						},
-						native: {},
-					});
-					this.subscribeStates('temperatureReturn');
-					await this.setStateAsync('temperatureReturn', {
-						val: roundNumberTwoDigits(temperatureReturn),
-						ack: true
-					});
+						await this.setObjectNotExistsAsync('flow', {
+							type: 'state',
+							common: {
+								name: 'flow',
+								type: 'number',
+								role: 'value.flow',
+								unit: 'l/h',
+								read: true,
+								write: false,
+							},
+							native: {},
+						});
+						this.subscribeStates('flow');
+						await this.setStateAsync('flow', {val: roundNumberTwoDigits(flow), ack: true});
 
-				} else {
-					throw new Error('unidentified sensor');
+						await this.setObjectNotExistsAsync('temperatureReturn', {
+							type: 'state',
+							common: {
+								name: 'temperatureReturn',
+								type: 'number',
+								role: 'value.temperatureReturn',
+								unit: '°C',
+								read: true,
+								write: false,
+							},
+							native: {},
+						});
+						this.subscribeStates('temperatureReturn');
+						await this.setStateAsync('temperatureReturn', {
+							val: roundNumberTwoDigits(temperatureReturn),
+							ack: true
+						});
+
+					} else {
+						throw new Error('unidentified sensor');
+					}
 				}
-			}
+
+			});
+			// for (const [sensorPort, productName] of sensorPortMap) {
+			// 	this.log.info(productName);
+			// 	if (productName === 'AH002') {
+			// 		const resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
+			// 		const humidityRack = resultSensor135[0];
+			// 		const temperatureRack = resultSensor135[1];
+			// 		await this.setObjectNotExistsAsync('temperatureRack', {
+			// 			type: 'state',
+			// 			common: {
+			// 				name: 'temperatureRack',
+			// 				type: 'number',
+			// 				role: 'value.temperatureRack',
+			// 				unit: '°C',
+			// 				read: true,
+			// 				write: false,
+			// 			},
+			// 			native: {},
+			// 		});
+			// 		//TODO: identifier infront of all states to just subscribe to identifier.*
+			// 		this.subscribeStates('temperatureRack');
+			// 		await this.setStateAsync('temperatureRack', {
+			// 			val: roundNumberTwoDigits(temperatureRack),
+			// 			ack: true
+			// 		});
+			//
+			// 		await this.setObjectNotExistsAsync('humidityRack', {
+			// 			type: 'state',
+			// 			common: {
+			// 				name: 'humidityRack',
+			// 				type: 'number',
+			// 				role: 'value.humidityRack',
+			// 				unit: '%',
+			// 				read: true,
+			// 				write: false,
+			// 			},
+			// 			native: {},
+			// 		});
+			// 		this.subscribeStates('humidityRack');
+			// 		await this.setStateAsync('humidityRack', {val: roundNumberTwoDigits(humidityRack), ack: true});
+			// 	} else if (productName === 'AT001') {
+			// 		const temperatureFlow = await getValueForSensor6(sensorPort, ipOfIOLink);
+			// 		tempFlow = temperatureFlow;
+			// 		await this.setObjectNotExistsAsync('temperatureFlow', {
+			// 			type: 'state',
+			// 			common: {
+			// 				name: 'temperatureFlow',
+			// 				type: 'number',
+			// 				role: 'value.temperatureFlow',
+			// 				unit: '°C',
+			// 				read: true,
+			// 				write: false,
+			// 			},
+			// 			native: {},
+			// 		});
+			// 		this.subscribeStates('temperatureFlow');
+			// 		await this.setStateAsync('temperatureFlow', {
+			// 			val: roundNumberTwoDigits(temperatureFlow),
+			// 			ack: true
+			// 		});
+			// 	} else if (productName === 'AP011') {
+			// 		const pressure = await getValueForSensor25(sensorPort, ipOfIOLink);
+			// 		await this.setObjectNotExistsAsync('pressure', {
+			// 			type: 'state',
+			// 			common: {
+			// 				name: 'Pressure',
+			// 				type: 'number',
+			// 				role: 'value.pressure',
+			// 				unit: 'Bar',
+			// 				read: true,
+			// 				write: false,
+			// 			},
+			// 			native: {},
+			// 		});
+			// 		this.subscribeStates('pressure');
+			// 		await this.setStateAsync('pressure', {val: roundNumberTwoDigits(pressure), ack: true});
+			// 	} else if (productName === 'AS005_LIQU') {
+			// 		//TODO: handel ul ol thingy
+			// 		const resultSensor48 = await getValueForSensor48(sensorPort, ipOfIOLink);
+			// 		const flow = resultSensor48[0];
+			// 		const temperatureReturn = resultSensor48[1];
+			// 		tempReturn = temperatureReturn;
+			//
+			// 		await this.setObjectNotExistsAsync('flow', {
+			// 			type: 'state',
+			// 			common: {
+			// 				name: 'flow',
+			// 				type: 'number',
+			// 				role: 'value.flow',
+			// 				unit: 'l/h',
+			// 				read: true,
+			// 				write: false,
+			// 			},
+			// 			native: {},
+			// 		});
+			// 		this.subscribeStates('flow');
+			// 		await this.setStateAsync('flow', {val: roundNumberTwoDigits(flow), ack: true});
+			//
+			// 		await this.setObjectNotExistsAsync('temperatureReturn', {
+			// 			type: 'state',
+			// 			common: {
+			// 				name: 'temperatureReturn',
+			// 				type: 'number',
+			// 				role: 'value.temperatureReturn',
+			// 				unit: '°C',
+			// 				read: true,
+			// 				write: false,
+			// 			},
+			// 			native: {},
+			// 		});
+			// 		this.subscribeStates('temperatureReturn');
+			// 		await this.setStateAsync('temperatureReturn', {
+			// 			val: roundNumberTwoDigits(temperatureReturn),
+			// 			ack: true
+			// 		});
+			//
+			// 	} else {
+			// 		throw new Error('unidentified sensor');
+			// 	}
+			// }
 
 			if (tempFlow != null && tempReturn != null) {
 				const temperatureDelta = tempReturn - tempFlow;
