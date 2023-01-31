@@ -12,7 +12,7 @@ const utils = require('@iobroker/adapter-core');
 // const fs = require("fs");
 const axios = require('axios');
 const {performance} = require('perf_hooks');
-const CONFIG = require('./config.json');
+const CONFIG = require('./config.js');
 
 
 class UnidentifiedSensorError extends Error {
