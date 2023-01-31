@@ -44,7 +44,7 @@ async function getValue(endpoint, requestBody) {
 
 async function getSensorPortMap(ipOfIOLink) {
 	const sensorIdPortMap = new Map();
-	for (let i = 1; i <= CONFIG.Ports; i++) {
+	for (let i = 1; i <= CONFIG.ports; i++) {
 		const sensorPort = i;
 		const productName = await getValue(ipOfIOLink, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/productname/getdata`));
 		if (CONFIG.sensors.includes(productName))
