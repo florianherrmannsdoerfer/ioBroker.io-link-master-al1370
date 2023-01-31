@@ -212,6 +212,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				await sleep(sleepTimer);
 				continue;
 			}
+			this.log.info(sensorPortMap);
 			for (const [sensorPort, productName] of sensorPortMap) {
 				this.log.info(productName);
 				if (productName === 'AH002') {
