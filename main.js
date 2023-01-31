@@ -155,9 +155,10 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			native: {},
 		});
 
-		let sensorPortMap;
+		let sensorPortMap = null;
 		await getSensorPortMap(ipOfIOLink)
 			.then(sensorPortMapReturn => {
+				this.log.info('test');
 				sensorPortMap = sensorPortMapReturn;
 				sensorPortMap.forEach((value, key) => {
 					this.setObjectNotExists(`${prefix}.Port${key}`, {
