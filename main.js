@@ -47,7 +47,7 @@ async function getSensorPortMap(ipOfIOLink) {
 	for (let i = 1; i <= CONFIG.Ports; i++) {
 		const sensorPort = i;
 		const productName = await getValue(ipOfIOLink, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/productname/getdata`));
-		if (CONFIG.Sensors.includes(productName))
+		if (CONFIG.sensors.includes(productName))
 			sensorIdPortMap.set(sensorPort, productName);
 		else
 			throw new UnidentifiedSensorError('Could not find Sensor: ' + productName + ' in Config!');
