@@ -215,9 +215,9 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			await getSensorPortMap(ipOfIOLink).then(async (sensorPortMap) => {
 				for (const [sensorPort, productName] of sensorPortMap) {
 					this.setObjectNotExists(`${prefix}.Port${sensorPort}`, {
-						type: 'state',
+						type: 'device',
 						common: {
-							name: `Port${productName}`,
+							name: `Port${sensorPort}`,
 							type: 'string',
 							role: 'value.SensorName',
 							read: true,
@@ -225,7 +225,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						},
 						native: {},
 					});
-					this.setState(`${prefix}.Port${productName}`, {
+					this.setState(`${prefix}.Port${sensorPort}`, {
 						val: productName,
 						ack: true
 					});
