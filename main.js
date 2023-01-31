@@ -213,9 +213,22 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				continue;
 			}
 			await getSensorPortMap(ipOfIOLink).then(async (sensorPortMap) => {
-				this.log.error('DO SOMETHING!!!!!');
 				for (const [sensorPort, productName] of sensorPortMap) {
-					this.log.info(productName);
+					this.setObjectNotExists(`${prefix}.Port${sensorPort}`, {
+						type: 'state',
+						common: {
+							name: `Port${productName}`,
+							type: 'string',
+							role: 'value.SensorName',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.setState(`${prefix}.Port${productName}`, {
+						val: productName,
+						ack: true
+					});
 					if (productName === 'AH002') {
 						const resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
 						const humidityRack = resultSensor135[0];
