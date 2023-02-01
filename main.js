@@ -10,7 +10,7 @@ const utils = require('@iobroker/adapter-core');
 
 // Load your modules here, e.g.:
 // const fs = require("fs");
-const axios = require('axios');
+const axios = require('axios').default;
 const {performance} = require('perf_hooks');
 const CONFIG = require('./config.js');
 
@@ -47,18 +47,31 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 	}
 
 	async getValue(requestBody) {
-		// @ts-ignore
-		const res = await axios({
-			method: 'post',
-			url: `http://${this.config.ioLinkIp}`,
-			timeout: 8000,
+
+		let data;
+
+		await axios.post(`http://${this.config.ioLinkIp}`, {
+			headers: {'content-type': 'application/json'},
 			data: requestBody,
-			headers: {'content-type': 'application/json'}
+			timeout: 8000
+		}).then(response => {
+			data = response.data['data']['value'];
 		}).catch(error => {
 			this.log.error(error);
-			this.stop;
 		});
-		return res.data['data']['value'];
+		return data;
+		// @ts-ignore
+		// const res = await axios({
+		// 	method: 'post',
+		// 	url: `http://${this.config.ioLinkIp}`,
+		// 	timeout: 8000,
+		// 	data: requestBody,
+		// 	headers: {'content-type': 'application/json'}
+		// }).catch(error => {
+		// 	this.log.error(error);
+		// 	this.stop;
+		// });
+		// return res.data['data']['value'];
 	}
 
 	async getSensorPortMap() {
