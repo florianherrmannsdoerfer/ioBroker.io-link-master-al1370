@@ -14,9 +14,6 @@ const axios = require('axios');
 const {performance} = require('perf_hooks');
 const CONFIG = require('./config.js');
 
-// let endpoint;
-
-
 class UnidentifiedSensorError extends Error {
 	constructor(message, sensorName) {
 		super(message);
@@ -26,7 +23,6 @@ class UnidentifiedSensorError extends Error {
 }
 
 class IoLinkMasterAl1370 extends utils.Adapter {
-
 	/**
 	 * @param {Partial<utils.AdapterOptions>} [options={}]
 	 */
@@ -40,12 +36,10 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		// this.on('objectChange', this.onObjectChange.bind(this));
 		// this.on('message', this.onMessage.bind(this));
 		this.on('unload', this.onUnload.bind(this));
-		this._endpoint = this.config.ioLinkIp;
-		this._sleepTimer = this.config.sleepTimer;
 	}
 
 	sleep() {
-		return new Promise(resolve => setTimeout(resolve, this._sleepTimer));
+		return new Promise(resolve => setTimeout(resolve, this.config.sleepTimer));
 	}
 
 	getRequestBody(adr) {
@@ -56,7 +50,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		// @ts-ignore
 		const res = await axios({
 			method: 'post',
-			url: `http://${this._endpoint}`,
+			url: `http://${this.config.ioLinkIp}`,
 			timeout: 8000,
 			data: requestBody,
 			headers: {'content-type': 'application/json'}
@@ -350,9 +344,6 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 	 */
 	async onReady() {
 
-		if (this._endpoint === undefined || this._endpoint === null)
-			this.stop;
-
 		const hostAlive = true;
 
 		await this.createObjectTree();
@@ -384,7 +375,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 
 			const end = performance.now();
 			this.log.info('Finished run in: ' + (end - start) + 'ms');
-			this.log.info('Going to sleep now for: ' + this._sleepTimer + 'ms');
+			this.log.info('Going to sleep now for: ' + this.config.sleepTimer + 'ms');
 			await this.sleep();
 		}
 
