@@ -370,9 +370,15 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				await this.checkIfHostIsAlive(endpoint).then(() => {
 					this.getValuesAndWriteValues();
 					i = checkHostAliveTries;
-				}).catch();
-				if (i === (checkHostAliveTries -1 ))
+				}).catch(() => {
+					this.log.warn('Could not reach host!');
+					this.log.warn('Try Nbr. ' + (i +1) + 'of ' + checkHostAliveTries);
+					sleep(sleepTimer);
+				});
+				if (i === (checkHostAliveTries -1)) {
+					this.log.error('Could not reach Host, shutting Adapter down!');
 					this.stop;
+				}
 			}
 
 
