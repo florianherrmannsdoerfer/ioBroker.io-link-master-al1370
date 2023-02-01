@@ -13,7 +13,8 @@ const utils = require('@iobroker/adapter-core');
 const axios = require('axios');
 const {performance} = require('perf_hooks');
 const CONFIG = require('./config.js');
-let endpoint;
+
+// let endpoint;
 
 
 class UnidentifiedSensorError extends Error {
@@ -22,99 +23,6 @@ class UnidentifiedSensorError extends Error {
 		this.name = 'UnidentifiedSensorError';
 		this.sensorName = sensorName;
 	}
-}
-
-function sleep(ms) {
-	return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function getRequestBody(adr) {
-	return `{"code": "request", "cid": 1, "adr": "${adr}"}`;
-}
-
-async function getValue(endpoint, requestBody) {
-	// @ts-ignore
-	const res = await axios({
-		method: 'post',
-		url: `http://${endpoint}`,
-		timeout: 8000,
-		data: requestBody,
-		headers: {'content-type': 'application/json'}
-	});
-	return res.data['data']['value'];
-}
-
-async function getSensorPortMap(ipOfIOLink) {
-	const sensorIdPortMap = new Map();
-	for (let i = 1; i <= CONFIG.ports; i++) {
-		const sensorPort = i;
-		const productName = await getValue(ipOfIOLink, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/productname/getdata`));
-		if (CONFIG.sensors.includes(productName))
-			sensorIdPortMap.set(sensorPort, productName);
-		else
-			throw new UnidentifiedSensorError('Could not find Sensor: ' + productName + ' in Config!', productName);
-	}
-	return sensorIdPortMap;
-}
-
-function roundNumberTwoDigits(number) {
-	return Number((Math.round(number * 100) / 100).toFixed(2));
-}
-
-function parseHexToInt16(number) {
-	const int16 = parseInt(number, 16);
-	if ((int16 & 0x8000) > 0) {
-		return (int16 - 0x10000);
-	}
-	return int16;
-}
-
-async function getValueForSensor135(sensorPort, endpoint) {
-	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
-	const humiditySub = hexString.substring(0, 4);
-	let humidity = parseHexToInt16(humiditySub);
-	humidity = humidity * 0.1;
-
-	const tempSub = hexString.substring(8, 12);
-	let temp = parseHexToInt16(tempSub);
-	temp = temp * 0.1;
-
-	return [humidity, temp];
-}
-
-async function getValueForSensor6(sensorPort, endpoint) {
-	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
-	const temperatureFlow = parseHexToInt16(hexString);
-	return (temperatureFlow * 0.1);
-}
-
-async function getValueForSensor25(sensorPort, endpoint) {
-	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
-	const wordZero = parseInt(hexString.substring(0, 4), 16);
-	return (wordZero >> 2);
-}
-
-async function getValueForSensor48(sensorPort, endpoint) {
-	const hexString = await getValue(endpoint, getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
-	const flow = parseHexToInt16(hexString.substring(0, 4));
-	const temperatureReturn = ((parseInt(hexString.substring(4, 8), 16)) >> 2) * 0.1;
-	return [flow, temperatureReturn];
-}
-
-async function checkIsHostAlive(endpoint) {
-	try {
-		await getValue(endpoint, getRequestBody(`/deviceinfo/productcode/getdata`));
-		return true;
-	} catch (error) {
-		return false;
-	}
-}
-
-async function initHost(ipOfIOLink) {
-	if (await checkIsHostAlive(ipOfIOLink))
-		return true;
-	else
-		return false;
 }
 
 class IoLinkMasterAl1370 extends utils.Adapter {
@@ -132,6 +40,101 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		// this.on('objectChange', this.onObjectChange.bind(this));
 		// this.on('message', this.onMessage.bind(this));
 		this.on('unload', this.onUnload.bind(this));
+		this._endpoint = this.config.ioLinkIp;
+		this._sleepTimer = this.config.sleepTimer;
+	}
+
+	sleep() {
+		return new Promise(resolve => setTimeout(resolve, this._sleepTimer));
+	}
+
+	getRequestBody(adr) {
+		return `{"code": "request", "cid": 1, "adr": "${adr}"}`;
+	}
+
+	async getValue(requestBody) {
+		// @ts-ignore
+		const res = await axios({
+			method: 'post',
+			url: `http://${this._endpoint}`,
+			timeout: 8000,
+			data: requestBody,
+			headers: {'content-type': 'application/json'}
+		});
+		return res.data['data']['value'];
+	}
+
+	async getSensorPortMap() {
+		const sensorIdPortMap = new Map();
+		for (let i = 1; i <= CONFIG.ports; i++) {
+			const sensorPort = i;
+			const productName = await this.getValue(this.getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/productname/getdata`));
+			if (CONFIG.sensors.includes(productName))
+				sensorIdPortMap.set(sensorPort, productName);
+			else
+				throw new UnidentifiedSensorError('Could not find Sensor: ' + productName + ' in Config!', productName);
+		}
+		return sensorIdPortMap;
+	}
+
+	roundNumberTwoDigits(number) {
+		return Number((Math.round(number * 100) / 100).toFixed(2));
+	}
+
+	parseHexToInt16(number) {
+		const int16 = parseInt(number, 16);
+		if ((int16 & 0x8000) > 0) {
+			return (int16 - 0x10000);
+		}
+		return int16;
+	}
+
+	async getValueForSensor135(sensorPort) {
+		const hexString = await this.getValue(this.getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
+		const humiditySub = hexString.substring(0, 4);
+		let humidity = this.parseHexToInt16(humiditySub);
+		humidity = humidity * 0.1;
+
+		const tempSub = hexString.substring(8, 12);
+		let temp = this.parseHexToInt16(tempSub);
+		temp = temp * 0.1;
+
+		return [humidity, temp];
+	}
+
+	async getValueForSensor6(sensorPort) {
+		const hexString = await this.getValue(this.getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
+		const temperatureFlow = this.parseHexToInt16(hexString);
+		return (temperatureFlow * 0.1);
+	}
+
+	async getValueForSensor25(sensorPort) {
+		const hexString = await this.getValue(this.getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
+		const wordZero = parseInt(hexString.substring(0, 4), 16);
+		return (wordZero >> 2);
+	}
+
+	async getValueForSensor48(sensorPort) {
+		const hexString = await this.getValue(this.getRequestBody(`/iolinkmaster/port[${sensorPort}]/iolinkdevice/pdin/getdata`));
+		const flow = this.parseHexToInt16(hexString.substring(0, 4));
+		const temperatureReturn = ((parseInt(hexString.substring(4, 8), 16)) >> 2) * 0.1;
+		return [flow, temperatureReturn];
+	}
+
+	async checkIsHostAlive() {
+		try {
+			await this.getValue(this.getRequestBody(`/deviceinfo/productcode/getdata`));
+			return true;
+		} catch (error) {
+			return false;
+		}
+	}
+
+	async initHost() {
+		if (await this.checkIsHostAlive())
+			return true;
+		else
+			return false;
 	}
 
 	async createObjectTree() {
@@ -144,7 +147,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		});
 	}
 
-	async checkIfHostIsAlive(ipOfIOLink) {
+	async checkIfHostIsAlive() {
 
 		await this.setObjectNotExistsAsync('isHostAlive', {
 			type: 'state',
@@ -160,7 +163,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		this.subscribeStates('isHostAlive');
 		let isHostAlive = false;
 
-		await checkIsHostAlive(ipOfIOLink).then(() => {
+		await this.checkIsHostAlive().then(() => {
 			isHostAlive = true;
 		}, () => {
 			isHostAlive = false;
@@ -185,7 +188,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 	async getValuesAndWriteValues() {
 		let tempFlow = null;
 		let tempReturn = null;
-		await getSensorPortMap(endpoint).then(async (sensorPortMap) => {
+		await this.getSensorPortMap().then(async (sensorPortMap) => {
 			for (const [sensorPort, productName] of sensorPortMap) {
 				this.setObjectNotExists(`${CONFIG.prefixPorts}.Port${sensorPort}`, {
 					type: 'device',
@@ -203,7 +206,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					ack: true
 				});
 				if (productName === 'AH002') {
-					const resultSensor135 = await getValueForSensor135(1, endpoint);
+					const resultSensor135 = await this.getValueForSensor135(1);
 					const humidityRack = resultSensor135[0];
 					const temperatureRack = resultSensor135[1];
 					await this.setObjectNotExistsAsync('temperatureRack', {
@@ -221,7 +224,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					//TODO: identifier infront of all states to just subscribe to identifier.*
 					this.subscribeStates('temperatureRack');
 					await this.setStateAsync('temperatureRack', {
-						val: roundNumberTwoDigits(temperatureRack),
+						val: this.roundNumberTwoDigits(temperatureRack),
 						ack: true
 					});
 
@@ -238,9 +241,9 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						native: {},
 					});
 					this.subscribeStates('humidityRack');
-					await this.setStateAsync('humidityRack', {val: roundNumberTwoDigits(humidityRack), ack: true});
+					await this.setStateAsync('humidityRack', {val: this.roundNumberTwoDigits(humidityRack), ack: true});
 				} else if (productName === 'AT001') {
-					const temperatureFlow = await getValueForSensor6(sensorPort, endpoint);
+					const temperatureFlow = await this.getValueForSensor6(sensorPort);
 					tempFlow = temperatureFlow;
 					await this.setObjectNotExistsAsync('temperatureFlow', {
 						type: 'state',
@@ -256,11 +259,11 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					});
 					this.subscribeStates('temperatureFlow');
 					await this.setStateAsync('temperatureFlow', {
-						val: roundNumberTwoDigits(temperatureFlow),
+						val: this.roundNumberTwoDigits(temperatureFlow),
 						ack: true
 					});
 				} else if (productName === 'AP011') {
-					const pressure = await getValueForSensor25(sensorPort, endpoint);
+					const pressure = await this.getValueForSensor25(sensorPort);
 					await this.setObjectNotExistsAsync('pressure', {
 						type: 'state',
 						common: {
@@ -274,10 +277,10 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						native: {},
 					});
 					this.subscribeStates('pressure');
-					await this.setStateAsync('pressure', {val: roundNumberTwoDigits(pressure), ack: true});
+					await this.setStateAsync('pressure', {val: this.roundNumberTwoDigits(pressure), ack: true});
 				} else if (productName === 'AS005_LIQU') {
 					//TODO: handel ul ol thingy
-					const resultSensor48 = await getValueForSensor48(sensorPort, endpoint);
+					const resultSensor48 = await this.getValueForSensor48(sensorPort);
 					const flow = resultSensor48[0];
 					const temperatureReturn = resultSensor48[1];
 					tempReturn = temperatureReturn;
@@ -295,7 +298,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 						native: {},
 					});
 					this.subscribeStates('flow');
-					await this.setStateAsync('flow', {val: roundNumberTwoDigits(flow), ack: true});
+					await this.setStateAsync('flow', {val: this.roundNumberTwoDigits(flow), ack: true});
 
 					await this.setObjectNotExistsAsync('temperatureReturn', {
 						type: 'state',
@@ -311,7 +314,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 					});
 					this.subscribeStates('temperatureReturn');
 					await this.setStateAsync('temperatureReturn', {
-						val: roundNumberTwoDigits(temperatureReturn),
+						val: this.roundNumberTwoDigits(temperatureReturn),
 						ack: true
 					});
 
@@ -338,7 +341,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 				native: {},
 			});
 			this.subscribeStates('temperatureDelta');
-			await this.setStateAsync('temperatureDelta', {val: roundNumberTwoDigits(temperatureDelta), ack: true});
+			await this.setStateAsync('temperatureDelta', {val: this.roundNumberTwoDigits(temperatureDelta), ack: true});
 		}
 	}
 
@@ -347,35 +350,32 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 	 */
 	async onReady() {
 
-		const sleepTimer = this.config.sleepTimer;
-		endpoint = this.config.ioLinkIp;
-
-		if (endpoint === undefined || endpoint === null)
+		if (this._endpoint === undefined || this._endpoint === null)
 			this.stop;
 
 		const hostAlive = true;
 
 		await this.createObjectTree();
 
-		if (!(await initHost(endpoint))) {
-			this.log.error('Could not initialise Host! Shutting adapter down!');
+		await this.initHost().catch(error => {
+			this.log.error(error);
 			this.stop;
-		}
+		});
 
 		while (hostAlive) {
 			const start = performance.now();
 			const checkHostAliveTries = 3;
 
 			for (let i = 0; i < checkHostAliveTries; i++) {
-				await this.checkIfHostIsAlive(endpoint).then(() => {
+				await this.checkIfHostIsAlive().then(() => {
 					this.getValuesAndWriteValues();
 					i = checkHostAliveTries;
 				}).catch(() => {
 					this.log.warn('Could not reach host!');
-					this.log.warn('Try Nbr. ' + (i +1) + 'of ' + checkHostAliveTries);
-					sleep(sleepTimer);
+					this.log.warn('Try Nbr. ' + (i + 1) + 'of ' + checkHostAliveTries);
+					this.sleep();
 				});
-				if (i === (checkHostAliveTries -1)) {
+				if (i === (checkHostAliveTries - 1)) {
 					this.log.error('Could not reach Host, shutting Adapter down!');
 					this.stop;
 				}
@@ -384,8 +384,8 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 
 			const end = performance.now();
 			this.log.info('Finished run in: ' + (end - start) + 'ms');
-			this.log.info('Going to sleep now for: ' + sleepTimer + 'ms');
-			await sleep(sleepTimer);
+			this.log.info('Going to sleep now for: ' + this._sleepTimer + 'ms');
+			await this.sleep();
 		}
 
 	}
