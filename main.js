@@ -50,7 +50,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 
 		let data;
 
-		await axios.post(`http://172.16.4.10`,
+		await axios.post(`http://${this.config.ioLinkIp}`,
 			requestBody
 		).then(response => {
 			data = response.data['data']['value'];
@@ -60,18 +60,6 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			this.log.error(error.response.headers);
 		});
 		return data;
-		// @ts-ignore
-		// const res = await axios({
-		// 	method: 'post',
-		// 	url: `http://${this.config.ioLinkIp}`,
-		// 	timeout: 8000,
-		// 	data: requestBody,
-		// 	headers: {'content-type': 'application/json'}
-		// }).catch(error => {
-		// 	this.log.error(error);
-		// 	this.stop;
-		// });
-		// return res.data['data']['value'];
 	}
 
 	async getSensorPortMap() {
