@@ -52,11 +52,10 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 
 		await axios.post(`http://172.16.4.10`, {
 			//headers: {'content-type': 'application/json'},
-			data: {
-				'code': 'request',
-				'cid': 1,
-				'adr': '/iolinkmaster/port[1]/iolinkdevice/pdin/getdata'
-			},
+
+			'code': 'request',
+			'cid': 1,
+			'adr': '/iolinkmaster/port[1]/iolinkdevice/pdin/getdata'
 			//timeout: 8000
 		}).then(response => {
 			data = response.data['data']['value'];
