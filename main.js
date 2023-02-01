@@ -57,7 +57,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		}).then(response => {
 			data = response.data['data']['value'];
 		}).catch(error => {
-			this.log.error(error);
+			this.log.error(error.toJSON());
 		});
 		return data;
 		// @ts-ignore
