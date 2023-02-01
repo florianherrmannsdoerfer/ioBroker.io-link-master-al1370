@@ -54,6 +54,9 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			timeout: 8000,
 			data: requestBody,
 			headers: {'content-type': 'application/json'}
+		}).catch(error => {
+			this.log.error(error);
+			this.stop;
 		});
 		return res.data['data']['value'];
 	}
@@ -125,10 +128,10 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 	}
 
 	async initHost() {
-		if (await this.checkIsHostAlive())
-			return true;
-		else
-			return false;
+		return await this.checkIsHostAlive().catch((error) => {
+			this.log.error(error);
+			this.stop;
+		});
 	}
 
 	async createObjectTree() {
