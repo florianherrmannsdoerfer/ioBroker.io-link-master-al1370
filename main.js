@@ -13,6 +13,7 @@ const utils = require('@iobroker/adapter-core');
 const axios = require('axios');
 const {performance} = require('perf_hooks');
 const CONFIG = require('./config.js');
+let endpoint;
 
 
 class UnidentifiedSensorError extends Error {
@@ -133,19 +134,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		this.on('unload', this.onUnload.bind(this));
 	}
 
-	/**
-	 * Is called when databases are connected and adapter received configuration.
-	 */
-	async onReady() {
-
-		const ipOfIOLink = this.config.ioLinkIp, sleepTimer = this.config.sleepTimer;
-		const hostAlive = true;
-
-		if (!(await initHost(ipOfIOLink))) {
-			this.log.error('Could not initialise Host! Shutting adapter down!');
-			this.stop;
-		}
-
+	async createObjectTree() {
 		await this.setObjectNotExistsAsync(CONFIG.prefixPorts, {
 			type: 'channel',
 			common: {
@@ -153,193 +142,239 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 			},
 			native: {},
 		});
+	}
 
-		while (hostAlive) {
-			const start = performance.now();
-			let tempFlow = null;
-			let tempReturn = null;
-			await this.setObjectNotExistsAsync('isHostAlive', {
-				type: 'state',
-				common: {
-					name: 'isHostAlive',
-					type: 'boolean',
-					role: 'value.isHostAlive',
-					read: true,
-					write: false,
-				},
-				native: {},
-			});
-			this.subscribeStates('isHostAlive');
-			if (await checkIsHostAlive(ipOfIOLink)) {
-				const getLastState = await this.getStateAsync('isHostAlive');
-				if (getLastState == null) {
-					await this.setStateAsync('isHostAlive', {val: true, ack: true});
-				} else {
-					if (getLastState.val === false)
-						await this.setStateAsync('isHostAlive', {val: true, ack: true});
-				}
+	async checkIfHostIsAlive(ipOfIOLink) {
+
+		await this.setObjectNotExistsAsync('isHostAlive', {
+			type: 'state',
+			common: {
+				name: 'isHostAlive',
+				type: 'boolean',
+				role: 'value.isHostAlive',
+				read: true,
+				write: false,
+			},
+			native: {},
+		});
+		this.subscribeStates('isHostAlive');
+		let isHostAlive = false;
+
+		await checkIsHostAlive(ipOfIOLink).then(() => {
+			isHostAlive = true;
+		}, () => {
+			isHostAlive = false;
+		}).catch(error =>
+			this.log.error('Host unreachable! ' + error));
+
+		if (isHostAlive) {
+			const getLastState = await this.getStateAsync('isHostAlive');
+			if (getLastState == null) {
+				await this.setStateAsync('isHostAlive', {val: true, ack: true});
 			} else {
-				await this.setStateAsync('isHostAlive', {val: false, ack: true});
-				this.log.error('Host went down! Trying again in: ' + sleepTimer + 'ms');
-				await sleep(sleepTimer);
-				continue;
+				if (getLastState.val === false)
+					await this.setStateAsync('isHostAlive', {val: true, ack: true});
 			}
+			return true;
+		} else {
+			await this.setStateAsync('isHostAlive', {val: false, ack: true});
+			return false;
+		}
+	}
 
-			await getSensorPortMap(ipOfIOLink).then(async (sensorPortMap) => {
-				for (const [sensorPort, productName] of sensorPortMap) {
-					this.setObjectNotExists(`${CONFIG.prefixPorts}.Port${sensorPort}`, {
-						type: 'device',
-						common: {
-							name: `Port${sensorPort}`,
-							type: 'string',
-							role: 'value.SensorName',
-							read: true,
-							write: false,
-						},
-						native: {},
-					});
-					this.setState(`${CONFIG.prefixPorts}.Port${sensorPort}`, {
-						val: productName,
-						ack: true
-					});
-					if (productName === 'AH002') {
-						const resultSensor135 = await getValueForSensor135(1, ipOfIOLink);
-						const humidityRack = resultSensor135[0];
-						const temperatureRack = resultSensor135[1];
-						await this.setObjectNotExistsAsync('temperatureRack', {
-							type: 'state',
-							common: {
-								name: 'temperatureRack',
-								type: 'number',
-								role: 'value.temperatureRack',
-								unit: '°C',
-								read: true,
-								write: false,
-							},
-							native: {},
-						});
-						//TODO: identifier infront of all states to just subscribe to identifier.*
-						this.subscribeStates('temperatureRack');
-						await this.setStateAsync('temperatureRack', {
-							val: roundNumberTwoDigits(temperatureRack),
-							ack: true
-						});
-
-						await this.setObjectNotExistsAsync('humidityRack', {
-							type: 'state',
-							common: {
-								name: 'humidityRack',
-								type: 'number',
-								role: 'value.humidityRack',
-								unit: '%',
-								read: true,
-								write: false,
-							},
-							native: {},
-						});
-						this.subscribeStates('humidityRack');
-						await this.setStateAsync('humidityRack', {val: roundNumberTwoDigits(humidityRack), ack: true});
-					} else if (productName === 'AT001') {
-						const temperatureFlow = await getValueForSensor6(sensorPort, ipOfIOLink);
-						tempFlow = temperatureFlow;
-						await this.setObjectNotExistsAsync('temperatureFlow', {
-							type: 'state',
-							common: {
-								name: 'temperatureFlow',
-								type: 'number',
-								role: 'value.temperatureFlow',
-								unit: '°C',
-								read: true,
-								write: false,
-							},
-							native: {},
-						});
-						this.subscribeStates('temperatureFlow');
-						await this.setStateAsync('temperatureFlow', {
-							val: roundNumberTwoDigits(temperatureFlow),
-							ack: true
-						});
-					} else if (productName === 'AP011') {
-						const pressure = await getValueForSensor25(sensorPort, ipOfIOLink);
-						await this.setObjectNotExistsAsync('pressure', {
-							type: 'state',
-							common: {
-								name: 'Pressure',
-								type: 'number',
-								role: 'value.pressure',
-								unit: 'Bar',
-								read: true,
-								write: false,
-							},
-							native: {},
-						});
-						this.subscribeStates('pressure');
-						await this.setStateAsync('pressure', {val: roundNumberTwoDigits(pressure), ack: true});
-					} else if (productName === 'AS005_LIQU') {
-						//TODO: handel ul ol thingy
-						const resultSensor48 = await getValueForSensor48(sensorPort, ipOfIOLink);
-						const flow = resultSensor48[0];
-						const temperatureReturn = resultSensor48[1];
-						tempReturn = temperatureReturn;
-
-						await this.setObjectNotExistsAsync('flow', {
-							type: 'state',
-							common: {
-								name: 'flow',
-								type: 'number',
-								role: 'value.flow',
-								unit: 'l/h',
-								read: true,
-								write: false,
-							},
-							native: {},
-						});
-						this.subscribeStates('flow');
-						await this.setStateAsync('flow', {val: roundNumberTwoDigits(flow), ack: true});
-
-						await this.setObjectNotExistsAsync('temperatureReturn', {
-							type: 'state',
-							common: {
-								name: 'temperatureReturn',
-								type: 'number',
-								role: 'value.temperatureReturn',
-								unit: '°C',
-								read: true,
-								write: false,
-							},
-							native: {},
-						});
-						this.subscribeStates('temperatureReturn');
-						await this.setStateAsync('temperatureReturn', {
-							val: roundNumberTwoDigits(temperatureReturn),
-							ack: true
-						});
-
-					} else {
-						throw new Error('unidentified sensor');
-					}
-				}
-
-			});
-
-			if (tempFlow != null && tempReturn != null) {
-				const temperatureDelta = tempReturn - tempFlow;
-
-				await this.setObjectNotExistsAsync('temperatureDelta', {
-					type: 'state',
+	async getValuesAndWriteValues() {
+		let tempFlow = null;
+		let tempReturn = null;
+		await getSensorPortMap(endpoint).then(async (sensorPortMap) => {
+			for (const [sensorPort, productName] of sensorPortMap) {
+				this.setObjectNotExists(`${CONFIG.prefixPorts}.Port${sensorPort}`, {
+					type: 'device',
 					common: {
-						name: 'temperatureDelta',
-						type: 'number',
-						role: 'value.temperatureDelta',
-						unit: '°C',
+						name: `Port${sensorPort}`,
+						type: 'string',
+						role: 'value.SensorName',
 						read: true,
 						write: false,
 					},
 					native: {},
 				});
-				this.subscribeStates('temperatureDelta');
-				await this.setStateAsync('temperatureDelta', {val: roundNumberTwoDigits(temperatureDelta), ack: true});
+				this.setState(`${CONFIG.prefixPorts}.Port${sensorPort}`, {
+					val: productName,
+					ack: true
+				});
+				if (productName === 'AH002') {
+					const resultSensor135 = await getValueForSensor135(1, endpoint);
+					const humidityRack = resultSensor135[0];
+					const temperatureRack = resultSensor135[1];
+					await this.setObjectNotExistsAsync('temperatureRack', {
+						type: 'state',
+						common: {
+							name: 'temperatureRack',
+							type: 'number',
+							role: 'value.temperatureRack',
+							unit: '°C',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					//TODO: identifier infront of all states to just subscribe to identifier.*
+					this.subscribeStates('temperatureRack');
+					await this.setStateAsync('temperatureRack', {
+						val: roundNumberTwoDigits(temperatureRack),
+						ack: true
+					});
+
+					await this.setObjectNotExistsAsync('humidityRack', {
+						type: 'state',
+						common: {
+							name: 'humidityRack',
+							type: 'number',
+							role: 'value.humidityRack',
+							unit: '%',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.subscribeStates('humidityRack');
+					await this.setStateAsync('humidityRack', {val: roundNumberTwoDigits(humidityRack), ack: true});
+				} else if (productName === 'AT001') {
+					const temperatureFlow = await getValueForSensor6(sensorPort, endpoint);
+					tempFlow = temperatureFlow;
+					await this.setObjectNotExistsAsync('temperatureFlow', {
+						type: 'state',
+						common: {
+							name: 'temperatureFlow',
+							type: 'number',
+							role: 'value.temperatureFlow',
+							unit: '°C',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.subscribeStates('temperatureFlow');
+					await this.setStateAsync('temperatureFlow', {
+						val: roundNumberTwoDigits(temperatureFlow),
+						ack: true
+					});
+				} else if (productName === 'AP011') {
+					const pressure = await getValueForSensor25(sensorPort, endpoint);
+					await this.setObjectNotExistsAsync('pressure', {
+						type: 'state',
+						common: {
+							name: 'Pressure',
+							type: 'number',
+							role: 'value.pressure',
+							unit: 'Bar',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.subscribeStates('pressure');
+					await this.setStateAsync('pressure', {val: roundNumberTwoDigits(pressure), ack: true});
+				} else if (productName === 'AS005_LIQU') {
+					//TODO: handel ul ol thingy
+					const resultSensor48 = await getValueForSensor48(sensorPort, endpoint);
+					const flow = resultSensor48[0];
+					const temperatureReturn = resultSensor48[1];
+					tempReturn = temperatureReturn;
+
+					await this.setObjectNotExistsAsync('flow', {
+						type: 'state',
+						common: {
+							name: 'flow',
+							type: 'number',
+							role: 'value.flow',
+							unit: 'l/h',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.subscribeStates('flow');
+					await this.setStateAsync('flow', {val: roundNumberTwoDigits(flow), ack: true});
+
+					await this.setObjectNotExistsAsync('temperatureReturn', {
+						type: 'state',
+						common: {
+							name: 'temperatureReturn',
+							type: 'number',
+							role: 'value.temperatureReturn',
+							unit: '°C',
+							read: true,
+							write: false,
+						},
+						native: {},
+					});
+					this.subscribeStates('temperatureReturn');
+					await this.setStateAsync('temperatureReturn', {
+						val: roundNumberTwoDigits(temperatureReturn),
+						ack: true
+					});
+
+				} else {
+					throw new Error('unidentified sensor');
+				}
 			}
+
+		});
+
+		if (tempFlow != null && tempReturn != null) {
+			const temperatureDelta = tempReturn - tempFlow;
+
+			await this.setObjectNotExistsAsync('temperatureDelta', {
+				type: 'state',
+				common: {
+					name: 'temperatureDelta',
+					type: 'number',
+					role: 'value.temperatureDelta',
+					unit: '°C',
+					read: true,
+					write: false,
+				},
+				native: {},
+			});
+			this.subscribeStates('temperatureDelta');
+			await this.setStateAsync('temperatureDelta', {val: roundNumberTwoDigits(temperatureDelta), ack: true});
+		}
+	}
+
+	/**
+	 * Is called when databases are connected and adapter received configuration.
+	 */
+	async onReady() {
+
+		const sleepTimer = this.config.sleepTimer;
+		endpoint = this.config.ioLinkIp;
+
+		if (endpoint === undefined || endpoint === null)
+			this.stop;
+
+		const hostAlive = true;
+
+		await this.createObjectTree();
+
+		if (!(await initHost(endpoint))) {
+			this.log.error('Could not initialise Host! Shutting adapter down!');
+			this.stop;
+		}
+
+		while (hostAlive) {
+			const start = performance.now();
+			const checkHostAliveTries = 3;
+
+			for (let i = 0; i < checkHostAliveTries; i++) {
+				await this.checkIfHostIsAlive(endpoint).then(() => {
+					this.getValuesAndWriteValues();
+					i = checkHostAliveTries;
+				}).catch();
+				if (i === (checkHostAliveTries -1 ))
+					this.stop;
+			}
+
 
 			const end = performance.now();
 			this.log.info('Finished run in: ' + (end - start) + 'ms');
