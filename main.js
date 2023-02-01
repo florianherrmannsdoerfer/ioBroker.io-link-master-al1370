@@ -50,9 +50,9 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 
 		let data;
 
-		await axios.post(`http://172.16.4.10`, {
+		await axios.post(`http://172.16.4.10`,
 			requestBody
-		}).then(response => {
+		).then(response => {
 			data = response.data['data']['value'];
 		}).catch(error => {
 			this.log.error(error.response.data);
