@@ -53,7 +53,7 @@ class IoLinkMasterAl1370 extends utils.Adapter {
 		await axios.post(`http://${this.config.ioLinkIp}`,
 			requestBody
 		).then(response => {
-			data = response.data['data']['value'];
+			data = response.data?.['data']?.['value'];
 		}).catch(error => {
 			this.log.error(error.response.data);
 			this.log.error(error.response.status);
